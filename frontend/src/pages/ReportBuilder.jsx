@@ -38,7 +38,7 @@ export default function ReportBuilder() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Advanced Report Builder</h1><p className="text-sm text-slate-500 mt-1">{filtered.length} rows · {selected.length} fields</p></div>
-        <Button onClick={exportCSV} className="bg-blue-700 hover:bg-blue-800"><Download className="w-4 h-4 mr-2" />Export CSV</Button>
+        <Button onClick={exportCSV} className="bg-teal-600 hover:bg-teal-700"><Download className="w-4 h-4 mr-2" />Export CSV</Button>
       </div>
       <Card className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -49,7 +49,7 @@ export default function ReportBuilder() {
           <Label className="text-xs font-semibold tracking-wider text-slate-500 uppercase">Fields</Label>
           <div className="flex flex-wrap gap-2 mt-2">{SOURCES[source].fields.map(f => (
             <button key={f} onClick={()=>setSelected(selected.includes(f) ? selected.filter(x=>x!==f) : [...selected, f])}
-              className={`px-2 py-1 rounded text-xs border ${selected.includes(f) ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-slate-200 text-slate-600"}`}>{f}</button>
+              className={`px-2 py-1 rounded text-xs border ${selected.includes(f) ? "bg-teal-50 border-teal-300 text-teal-700" : "bg-white border-slate-200 text-slate-600"}`}>{f}</button>
           ))}</div>
         </div>
       </Card>

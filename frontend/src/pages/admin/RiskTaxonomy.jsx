@@ -27,7 +27,7 @@ export default function RiskTaxonomy() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Risk Taxonomy</h1><p className="text-sm text-slate-500 mt-1">{list.length} categories</p></div>
-        <Button onClick={() => { setEditing({ code:"", name:"", description:"", status:"Active" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Add Category</Button>
+        <Button onClick={() => { setEditing({ code:"", name:"", description:"", status:"Active" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" />Add Category</Button>
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm"><thead className="bg-slate-50 border-b border-slate-200"><tr className="text-xs uppercase tracking-wider text-slate-500"><th className="text-left py-2.5 px-3">Code</th><th className="text-left py-2.5 px-3">Name</th><th className="text-left py-2.5 px-3">Description</th><th className="text-left py-2.5 px-3">Status</th><th></th></tr></thead><tbody>
@@ -46,7 +46,7 @@ export default function RiskTaxonomy() {
           <div><Label>Description</Label><Textarea value={editing.description} onChange={(e) => setEditing({...editing, description: e.target.value})} /></div>
           <div><Label>Status</Label><Select value={editing.status} onValueChange={(v) => setEditing({...editing, status: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
         </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
       </DialogContent></Dialog>
     </div>
   );

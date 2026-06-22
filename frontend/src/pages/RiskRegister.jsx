@@ -56,7 +56,7 @@ export default function RiskRegister() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={exportCSV} data-testid="export-csv-btn"><Download className="w-4 h-4 mr-2" />Export CSV</Button>
-          {canCreate && <Button asChild className="bg-blue-700 hover:bg-blue-800" data-testid="create-risk-btn"><Link to="/risks/new"><Plus className="w-4 h-4 mr-2" />New Risk</Link></Button>}
+          {canCreate && <Button asChild className="bg-teal-600 hover:bg-teal-700" data-testid="create-risk-btn"><Link to="/risks/new"><Plus className="w-4 h-4 mr-2" />New Risk</Link></Button>}
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export default function RiskRegister() {
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition" data-testid={`risk-row-${r.risk_id}`}>
-                  <td className="py-2.5 px-3 font-mono text-xs"><Link to={`/risks/${r.id}`} className="text-blue-700 hover:underline font-medium">{r.risk_id}</Link></td>
+                  <td className="py-2.5 px-3 font-mono text-xs"><Link to={`/risks/${r.id}`} className="text-teal-700 hover:underline font-medium">{r.risk_id}</Link></td>
                   <td className="py-2.5 px-3 max-w-xs truncate text-slate-800">{r.title}</td>
                   <td className="py-2.5 px-3 text-slate-600">{catMap[r.category_id] || "—"}</td>
                   <td className="py-2.5 px-3 text-slate-600">{r.business_unit}</td>

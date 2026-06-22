@@ -24,7 +24,7 @@ export default function Obligations() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Compliance Obligations</h1><p className="text-sm text-slate-500 mt-1">{list.length} obligations · {list.filter(o=>o.status==="Overdue").length} overdue</p></div>
-        <Button onClick={()=>{ setEditing({ title:"", description:"", obligation_type:"Regulatory", regulator:"", regulation_ref:"", frequency:"Quarterly", due_date:"", reminder_days:14, status:"Not Started", evidence_notes:"", remarks:"" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Add</Button>
+        <Button onClick={()=>{ setEditing({ title:"", description:"", obligation_type:"Regulatory", regulator:"", regulation_ref:"", frequency:"Quarterly", due_date:"", reminder_days:14, status:"Not Started", evidence_notes:"", remarks:"" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" />Add</Button>
       </div>
       <Card className="overflow-hidden"><table className="w-full text-sm"><thead className="bg-slate-50 border-b"><tr className="text-xs uppercase tracking-wider text-slate-500"><th className="text-left py-2 px-3">Title</th><th className="text-left py-2 px-3">Type</th><th className="text-left py-2 px-3">Regulator</th><th className="text-left py-2 px-3">Frequency</th><th className="text-left py-2 px-3">Due</th><th className="text-left py-2 px-3">Status</th><th></th></tr></thead><tbody>
         {list.map(o=>(<tr key={o.id} className={`border-b border-slate-100 hover:bg-slate-50 ${o.status==="Overdue"?"bg-rose-50/40":""}`}><td className="py-2 px-3 font-medium">{o.title}</td><td className="py-2 px-3">{o.obligation_type}</td><td className="py-2 px-3 text-xs">{o.regulator}</td><td className="py-2 px-3">{o.frequency}</td><td className="py-2 px-3 text-xs font-mono">{o.due_date}</td><td className="py-2 px-3"><StatusBadge status={o.status} /></td><td className="py-2 px-3"><Button size="sm" variant="outline" onClick={()=>{ setEditing(o); setOpen(true); }}>Edit</Button></td></tr>))}
@@ -42,7 +42,7 @@ export default function Obligations() {
         <div><Label>Category</Label><Select value={editing.category_id||""} onValueChange={v=>setEditing({...editing, category_id:v})}><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger><SelectContent>{cats.map(c=><SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
         <div className="col-span-2"><Label>Description</Label><Textarea value={editing.description} onChange={e=>setEditing({...editing, description:e.target.value})} /></div>
         <div className="col-span-2"><Label>Evidence Notes</Label><Textarea value={editing.evidence_notes} onChange={e=>setEditing({...editing, evidence_notes:e.target.value})} /></div>
-      </div>}<DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter></DialogContent></Dialog>
+      </div>}<DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }

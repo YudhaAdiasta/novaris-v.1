@@ -13,7 +13,7 @@ export default function UsersRoles() {
           {list.map((u) => (
             <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
               <td className="py-2.5 px-3 font-medium">{u.name}</td><td className="py-2.5 px-3 font-mono text-xs">{u.email}</td>
-              <td className="py-2.5 px-3"><span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200">{ROLE_LABELS[u.role]}</span></td>
+              <td className="py-2.5 px-3"><span className="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700 border border-teal-200">{ROLE_LABELS[u.role]}</span></td>
               <td className="py-2.5 px-3 text-slate-600">{u.department}</td><td className="py-2.5 px-3"><span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">{u.status}</span></td>
             </tr>
           ))}

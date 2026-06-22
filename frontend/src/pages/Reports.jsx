@@ -27,7 +27,7 @@ export default function Reports() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Reports</h1>
           <p className="text-sm text-slate-500 mt-1">Risk Register Report</p>
         </div>
-        <Button onClick={exportCSV} className="bg-blue-700 hover:bg-blue-800" data-testid="export-report-btn"><Download className="w-4 h-4 mr-2" />Export CSV</Button>
+        <Button onClick={exportCSV} className="bg-teal-600 hover:bg-teal-700" data-testid="export-report-btn"><Download className="w-4 h-4 mr-2" />Export CSV</Button>
       </div>
 
       <Card className="overflow-hidden">

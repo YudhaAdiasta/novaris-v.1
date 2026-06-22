@@ -8,12 +8,13 @@ import { Card } from "@/components/ui/card";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const DEMO = (() => {
-  try {
-    if (process.env.REACT_APP_DEMO_ACCOUNTS) return JSON.parse(process.env.REACT_APP_DEMO_ACCOUNTS);
-  } catch (e) { /* fallback to empty list */ }
-  return [];
-})();
+const DEMO = [
+  { role: "Admin", email: "admin@demo.com", password: "Admin@123" },
+  { role: "Risk Officer", email: "riskofficer@demo.com", password: "Officer@123" },
+  { role: "Risk Owner", email: "riskowner@demo.com", password: "Owner@123" },
+  { role: "Approver", email: "approver@demo.com", password: "Approver@123" },
+  { role: "Viewer / Auditor", email: "auditor@demo.com", password: "Viewer@123" },
+];
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -35,11 +36,11 @@ export default function Login() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-slate-900 text-white relative overflow-hidden">
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl" />
-        <div className="absolute top-1/3 -left-20 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-teal-500/20 blur-3xl" />
+        <div className="absolute top-1/3 -left-20 w-72 h-72 rounded-full bg-teal-400/10 blur-3xl" />
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-md bg-blue-600 flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></div>
+            <div className="w-9 h-9 rounded-md bg-teal-600 flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></div>
             <div className="font-heading text-xl font-bold tracking-tight">NOVARIS</div>
           </div>
         </div>
@@ -58,7 +59,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center text-white"><ShieldCheck className="w-4 h-4" /></div>
+            <div className="w-8 h-8 rounded-md bg-teal-600 flex items-center justify-center text-white"><ShieldCheck className="w-4 h-4" /></div>
             <span className="font-heading text-lg font-bold">NOVARIS</span>
           </div>
           <div>
@@ -74,7 +75,7 @@ export default function Login() {
               <Label htmlFor="password" className="text-xs font-semibold tracking-wider text-slate-500 uppercase">Password</Label>
               <Input id="password" data-testid="login-password-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-10 mt-1" />
             </div>
-            <Button type="submit" disabled={busy} data-testid="login-submit-button" className="w-full h-10 bg-blue-700 hover:bg-blue-800 text-white">
+            <Button type="submit" disabled={busy} data-testid="login-submit-button" className="w-full h-10 bg-teal-600 hover:bg-teal-700 text-white">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
             </Button>
           </form>

@@ -29,7 +29,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <Kpi icon={Activity} label="Total Risks" value={data.total_risks} tone="bg-blue-50 text-blue-700" />
+        <Kpi icon={Activity} label="Total Risks" value={data.total_risks} tone="bg-teal-50 text-teal-700" />
         <Kpi icon={ShieldAlert} label="Critical" value={data.critical_risks} tone="bg-rose-50 text-rose-700" />
         <Kpi icon={AlertTriangle} label="High" value={data.high_risks} tone="bg-orange-50 text-orange-700" />
         <Kpi icon={TrendingUp} label="Exceeds Appetite" value={data.exceeding_appetite} tone="bg-rose-50 text-rose-700" />
@@ -40,7 +40,7 @@ export default function Dashboard() {
 
       {adv && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Kpi icon={Activity} label="KRIs Total" value={adv.kri_total} tone="bg-blue-50 text-blue-700" />
+          <Kpi icon={Activity} label="KRIs Total" value={adv.kri_total} tone="bg-teal-50 text-teal-700" />
           <Kpi icon={AlertTriangle} label="KRIs Red" value={adv.kri_red} tone="bg-rose-50 text-rose-700" />
           <Kpi icon={AlertTriangle} label="KRIs Amber" value={adv.kri_amber} tone="bg-amber-50 text-amber-700" />
           <Kpi icon={ShieldAlert} label="Incidents Open" value={adv.incidents_open} tone="bg-orange-50 text-orange-700" />
@@ -52,7 +52,7 @@ export default function Dashboard() {
 
       {p3 && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Kpi icon={Activity} label="Upcoming Meetings" value={p3.upcoming_meetings} tone="bg-blue-50 text-blue-700" />
+          <Kpi icon={Activity} label="Upcoming Meetings" value={p3.upcoming_meetings} tone="bg-teal-50 text-teal-700" />
           <Kpi icon={AlertTriangle} label="Overdue Obligations" value={p3.overdue_obligations} tone="bg-rose-50 text-rose-700" />
           <Kpi icon={Clock} label="Obligations ≤ 30d" value={p3.upcoming_obligations} tone="bg-amber-50 text-amber-700" />
           <Kpi icon={ShieldAlert} label="Failed Tests" value={p3.tests_failed} tone="bg-rose-50 text-rose-700" />
@@ -86,7 +86,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={catData} dataKey="value" nameKey="name" outerRadius={90} label={{ fontSize: 11 }}>
-                  {catData.map((_, i) => <Cell key={i} fill={["#0052CC","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} />)}
+                  {catData.map((_, i) => <Cell key={i} fill={["#0D9488","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -103,7 +103,7 @@ export default function Dashboard() {
                 <XAxis type="number" tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} width={130} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#0052CC" radius={[0,4,4,0]} />
+                <Bar dataKey="value" fill="#0D9488" radius={[0,4,4,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -133,7 +133,7 @@ export default function Dashboard() {
             <tbody>
               {data.top_residual.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-2 px-3 font-mono text-xs"><Link to={`/risks/${r.id}`} className="text-blue-700 hover:underline">{r.risk_id}</Link></td>
+                  <td className="py-2 px-3 font-mono text-xs"><Link to={`/risks/${r.id}`} className="text-teal-700 hover:underline">{r.risk_id}</Link></td>
                   <td className="py-2 px-3">{r.title}</td>
                   <td className="py-2 px-3"><RiskBadge level={r.residual_level} /></td>
                   <td className="py-2 px-3 font-mono">{r.residual_score}</td>

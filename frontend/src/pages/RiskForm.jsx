@@ -157,7 +157,7 @@ export default function RiskForm() {
       <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-white/80 backdrop-blur border-t border-slate-200 -mx-6 lg:-mx-8 px-6 lg:px-8 py-4">
         <Button variant="outline" onClick={() => nav(-1)}>Cancel</Button>
         <Button variant="outline" onClick={() => save(false)} disabled={busy} data-testid="save-draft-btn">Save as Draft</Button>
-        <Button onClick={() => save(true)} disabled={busy} className="bg-blue-700 hover:bg-blue-800" data-testid="submit-risk-btn">Submit for Review</Button>
+        <Button onClick={() => save(true)} disabled={busy} className="bg-teal-600 hover:bg-teal-700" data-testid="submit-risk-btn">Submit for Review</Button>
       </div>
     </div>
   );

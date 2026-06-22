@@ -35,7 +35,7 @@ export default function Incidents() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Incidents &amp; Loss Events</h1><p className="text-sm text-slate-500 mt-1">{list.length} incidents · Total loss IDR {totalLoss.toLocaleString()}</p></div>
-        <Button onClick={() => { setEditing({ title:"", description:"", business_unit:"", occurrence_date: new Date().toISOString().slice(0,10), severity:"Medium", status:"Reported", financial_loss: 0, root_cause:"", corrective_actions:"" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800" data-testid="add-incident-btn"><Plus className="w-4 h-4 mr-2" />Report Incident</Button>
+        <Button onClick={() => { setEditing({ title:"", description:"", business_unit:"", occurrence_date: new Date().toISOString().slice(0,10), severity:"Medium", status:"Reported", financial_loss: 0, root_cause:"", corrective_actions:"" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700" data-testid="add-incident-btn"><Plus className="w-4 h-4 mr-2" />Report Incident</Button>
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm" data-testid="incident-table">
@@ -43,7 +43,7 @@ export default function Incidents() {
           <tbody>
             {list.map((i) => (
               <tr key={i.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="py-2.5 px-3 font-mono text-xs text-blue-700">{i.incident_code}</td>
+                <td className="py-2.5 px-3 font-mono text-xs text-teal-700">{i.incident_code}</td>
                 <td className="py-2.5 px-3 font-medium max-w-md truncate">{i.title}</td>
                 <td className="py-2.5 px-3">{i.business_unit}</td>
                 <td className="py-2.5 px-3 text-xs">{i.occurrence_date}</td>
@@ -69,7 +69,7 @@ export default function Incidents() {
           <div className="col-span-2"><Label>Root Cause</Label><Textarea rows={2} value={editing.root_cause} onChange={(e) => setEditing({...editing, root_cause: e.target.value})} /></div>
           <div className="col-span-2"><Label>Corrective Actions</Label><Textarea rows={2} value={editing.corrective_actions} onChange={(e) => setEditing({...editing, corrective_actions: e.target.value})} /></div>
         </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
       </DialogContent></Dialog>
     </div>
   );

@@ -30,7 +30,7 @@ export default function RiskAppetite() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Risk Appetite</h1><p className="text-sm text-slate-500 mt-1">Maximum acceptable residual risk by category</p></div>
-        <Button onClick={() => { setEditing({ category_id:"", appetite_level:"Medium", description:"", status:"Active" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800">Add</Button>
+        <Button onClick={() => { setEditing({ category_id:"", appetite_level:"Medium", description:"", status:"Active" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700">Add</Button>
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm"><thead className="bg-slate-50 border-b border-slate-200"><tr className="text-xs uppercase tracking-wider text-slate-500"><th className="text-left py-2.5 px-3">Category</th><th className="text-left py-2.5 px-3">Appetite</th><th className="text-left py-2.5 px-3">Description</th><th className="text-left py-2.5 px-3">Status</th><th></th></tr></thead><tbody>
@@ -51,7 +51,7 @@ export default function RiskAppetite() {
           <div><Label>Appetite Level</Label><Select value={editing.appetite_level} onValueChange={(v) => setEditing({...editing, appetite_level: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Low","Medium","High","Critical"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
           <div><Label>Description</Label><Textarea value={editing.description} onChange={(e) => setEditing({...editing, description: e.target.value})} /></div>
         </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
       </DialogContent></Dialog>
     </div>
   );

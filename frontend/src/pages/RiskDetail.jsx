@@ -61,7 +61,7 @@ export default function RiskDetail() {
           <Button variant="ghost" size="icon" onClick={() => nav(-1)}><ArrowLeft className="w-4 h-4" /></Button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-blue-700 font-semibold">{risk.risk_id}</span>
+              <span className="font-mono text-xs text-teal-700 font-semibold">{risk.risk_id}</span>
               <StatusBadge status={risk.status} />
             </div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900 mt-1">{risk.title}</h1>
@@ -69,7 +69,7 @@ export default function RiskDetail() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {can.edit && <Button variant="outline" asChild><Link to={`/risks/${id}/edit`}><Edit3 className="w-4 h-4 mr-2" />Edit</Link></Button>}
-          {can.submit && user.role === "risk_owner" && <Button onClick={() => act("submit")} className="bg-blue-700 hover:bg-blue-800" data-testid="submit-btn">Submit for Review</Button>}
+          {can.submit && user.role === "risk_owner" && <Button onClick={() => act("submit")} className="bg-teal-600 hover:bg-teal-700" data-testid="submit-btn">Submit for Review</Button>}
           {can.review && risk.status === "Submitted" && <Button variant="outline" onClick={() => act("review")} data-testid="start-review-btn">Start Review</Button>}
           {can.approve && <Button onClick={() => setDialog("approve")} className="bg-emerald-600 hover:bg-emerald-700" data-testid="approve-risk-btn">Approve</Button>}
           {can.approve && <Button variant="outline" onClick={() => setDialog("return")} data-testid="return-risk-btn">Return</Button>}
@@ -111,7 +111,7 @@ export default function RiskDetail() {
             <thead><tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="text-left py-2 px-3">Name</th><th className="text-left py-2 px-3">Type</th><th className="text-left py-2 px-3">Frequency</th><th className="text-left py-2 px-3">Design</th><th className="text-left py-2 px-3">Operating</th><th className="text-left py-2 px-3">Overall</th></tr></thead>
             <tbody>
               {(risk.controls || []).map((c) => (
-                <tr key={c.id} className="border-b border-slate-100"><td className="py-2 px-3 font-medium">{c.control_name}</td><td className="py-2 px-3">{c.control_type}</td><td className="py-2 px-3">{c.frequency}</td><td className="py-2 px-3">{c.design_effectiveness}</td><td className="py-2 px-3">{c.operating_effectiveness}</td><td className="py-2 px-3"><span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200">{c.overall_effectiveness}</span></td></tr>
+                <tr key={c.id} className="border-b border-slate-100"><td className="py-2 px-3 font-medium">{c.control_name}</td><td className="py-2 px-3">{c.control_type}</td><td className="py-2 px-3">{c.frequency}</td><td className="py-2 px-3">{c.design_effectiveness}</td><td className="py-2 px-3">{c.operating_effectiveness}</td><td className="py-2 px-3"><span className="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700 border border-teal-200">{c.overall_effectiveness}</span></td></tr>
               ))}
               {(!risk.controls || risk.controls.length === 0) && <tr><td colSpan="6" className="py-6 text-center text-slate-400">No controls added.</td></tr>}
             </tbody>

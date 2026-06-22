@@ -23,7 +23,7 @@ export default function Notifications() {
           {list.map((n) => (
             <div key={n.id} onClick={() => !n.read && markOne(n.id)} className={`p-4 cursor-pointer hover:bg-slate-50 ${!n.read ? "bg-blue-50/30" : ""}`}>
               <div className="flex items-start gap-3">
-                <div className={`w-2 h-2 rounded-full mt-2 ${n.read ? "bg-slate-300" : "bg-blue-600"}`} />
+                <div className={`w-2 h-2 rounded-full mt-2 ${n.read ? "bg-slate-300" : "bg-teal-600"}`} />
                 <div className="flex-1">
                   <div className={`text-sm ${n.read ? "text-slate-600" : "text-slate-900 font-medium"}`}>{n.message}</div>
                   <div className="text-xs text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()} · {n.object_type}</div>

@@ -23,7 +23,7 @@ export default function ApprovalTasks() {
                 <td className="py-2.5 px-3">{t.object_type}</td>
                 <td className="py-2.5 px-3 text-xs text-slate-500">{new Date(t.submitted_date).toLocaleString()}</td>
                 <td className="py-2.5 px-3"><StatusBadge status={t.status} /></td>
-                <td className="py-2.5 px-3">{t.object_type === "Risk" ? <Link to={`/risks/${t.object_id}`} className="text-blue-700 hover:underline text-sm font-medium">Open</Link> : <Link to="/treatments" className="text-blue-700 hover:underline text-sm font-medium">Open</Link>}</td>
+                <td className="py-2.5 px-3">{t.object_type === "Risk" ? <Link to={`/risks/${t.object_id}`} className="text-teal-700 hover:underline text-sm font-medium">Open</Link> : <Link to="/treatments" className="text-teal-700 hover:underline text-sm font-medium">Open</Link>}</td>
               </tr>
             ))}
             {tasks.length === 0 && <tr><td colSpan="5" className="py-10 text-center text-slate-400">No approval tasks.</td></tr>}

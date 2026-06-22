@@ -52,17 +52,17 @@ export default function TreatmentPlans() {
           <tbody>
             {list.map((t) => (
               <tr key={t.id} className={`border-b border-slate-100 hover:bg-slate-50 ${t.is_overdue ? "bg-rose-50/40" : ""}`}>
-                <td className="py-2.5 px-3"><Link to={`/risks/${t.risk_id}`} className="text-blue-700 hover:underline font-mono text-xs">{riskMap[t.risk_id]?.risk_id || "—"}</Link></td>
+                <td className="py-2.5 px-3"><Link to={`/risks/${t.risk_id}`} className="text-teal-700 hover:underline font-mono text-xs">{riskMap[t.risk_id]?.risk_id || "—"}</Link></td>
                 <td className="py-2.5 px-3 max-w-xs truncate">{t.action_description || <span className="text-slate-400 italic">no description</span>}</td>
                 <td className="py-2.5 px-3">{t.action_owner || "—"}</td>
                 <td className="py-2.5 px-3">{t.priority}</td>
                 <td className="py-2.5 px-3 text-xs">{t.target_completion_date || "—"} {t.is_overdue && <span className="text-rose-600 font-semibold ml-1">OVERDUE</span>}</td>
-                <td className="py-2.5 px-3"><div className="flex items-center gap-2"><div className="w-20 h-1.5 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-blue-600" style={{ width: `${t.progress_percentage || 0}%` }} /></div><span className="text-xs">{t.progress_percentage || 0}%</span></div></td>
+                <td className="py-2.5 px-3"><div className="flex items-center gap-2"><div className="w-20 h-1.5 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-teal-600" style={{ width: `${t.progress_percentage || 0}%` }} /></div><span className="text-xs">{t.progress_percentage || 0}%</span></div></td>
                 <td className="py-2.5 px-3"><StatusBadge status={t.status} /></td>
                 <td className="py-2.5 px-3">
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => setEditing(t)}>Edit</Button>
-                    {t.status === "Draft" && <Button size="sm" onClick={() => action(t.id, "submit")} className="bg-blue-700 hover:bg-blue-800">Submit</Button>}
+                    {t.status === "Draft" && <Button size="sm" onClick={() => action(t.id, "submit")} className="bg-teal-600 hover:bg-teal-700">Submit</Button>}
                     {t.status === "Submitted" && ["admin","risk_officer","approver"].includes(user.role) && <Button size="sm" onClick={() => action(t.id, "approve")} className="bg-emerald-600 hover:bg-emerald-700">Approve</Button>}
                     {t.status === "In Progress" && <Button size="sm" onClick={() => action(t.id, "complete")} className="bg-purple-600 hover:bg-purple-700">Complete</Button>}
                     {t.status === "Pending Validation" && ["admin","risk_officer"].includes(user.role) && <Button size="sm" onClick={() => action(t.id, "validate")} className="bg-emerald-600 hover:bg-emerald-700">Validate</Button>}
@@ -90,7 +90,7 @@ export default function TreatmentPlans() {
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button>
+            <Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button>
           </div>
         </Card>
       )}

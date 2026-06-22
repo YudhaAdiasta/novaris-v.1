@@ -28,7 +28,7 @@ export default function EscalationMatrix() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Escalation Matrix</h1><p className="text-sm text-slate-500 mt-1">Rules that govern when and to whom risks are escalated.</p></div>
-        <Button onClick={() => { setEditing({ risk_level:"High", notify_role:"risk_officer", days_to_escalate:3, description:"" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Add Rule</Button>
+        <Button onClick={() => { setEditing({ risk_level:"High", notify_role:"risk_officer", days_to_escalate:3, description:"" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" />Add Rule</Button>
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
@@ -37,7 +37,7 @@ export default function EscalationMatrix() {
             {list.map((e) => (
               <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="py-2.5 px-3"><RiskBadge level={e.risk_level} /></td>
-                <td className="py-2.5 px-3"><span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200">{ROLE_LABELS[e.notify_role] || e.notify_role}</span></td>
+                <td className="py-2.5 px-3"><span className="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700 border border-teal-200">{ROLE_LABELS[e.notify_role] || e.notify_role}</span></td>
                 <td className="py-2.5 px-3 font-mono">{e.days_to_escalate} day(s)</td>
                 <td className="py-2.5 px-3 text-slate-600">{e.description}</td>
                 <td className="py-2.5 px-3"><Button size="sm" variant="ghost" onClick={() => del(e.id)}><Trash2 className="w-4 h-4 text-rose-600" /></Button></td>
@@ -53,7 +53,7 @@ export default function EscalationMatrix() {
           <div><Label>Days to Escalate</Label><Input type="number" min={1} value={editing.days_to_escalate} onChange={(e) => setEditing({...editing, days_to_escalate: e.target.value})} /></div>
           <div><Label>Description</Label><Textarea value={editing.description} onChange={(e) => setEditing({...editing, description: e.target.value})} /></div>
         </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
       </DialogContent></Dialog>
     </div>
   );

@@ -32,7 +32,7 @@ export default function KRI() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Key Risk Indicators</h1><p className="text-sm text-slate-500 mt-1">{list.length} KRIs · {list.filter(k=>k.status==="Red").length} in red</p></div>
-        <Button onClick={() => { setEditing({ name:"", unit:"", frequency:"Monthly", threshold_green:0, threshold_amber:0, threshold_red:0, current_value:0, direction:"higher_is_worse", description:"" }); setOpen(true); }} className="bg-blue-700 hover:bg-blue-800" data-testid="add-kri-btn"><Plus className="w-4 h-4 mr-2" />Add KRI</Button>
+        <Button onClick={() => { setEditing({ name:"", unit:"", frequency:"Monthly", threshold_green:0, threshold_amber:0, threshold_red:0, current_value:0, direction:"higher_is_worse", description:"" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700" data-testid="add-kri-btn"><Plus className="w-4 h-4 mr-2" />Add KRI</Button>
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm" data-testid="kri-table">
@@ -65,7 +65,7 @@ export default function KRI() {
           <div><Label>Amber Threshold</Label><Input type="number" step="0.01" value={editing.threshold_amber} onChange={(e) => setEditing({...editing, threshold_amber: e.target.value})} /></div>
           <div><Label>Red Threshold</Label><Input type="number" step="0.01" value={editing.threshold_red} onChange={(e) => setEditing({...editing, threshold_red: e.target.value})} /></div>
         </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-blue-700 hover:bg-blue-800">Save</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
       </DialogContent></Dialog>
     </div>
   );
