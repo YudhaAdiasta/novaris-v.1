@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import DataTable, { RowActions, IconAction } from "@/components/DataTable";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 export default function RiskTaxonomy() {
   const [list, setList] = useState([]);
@@ -16,6 +16,7 @@ export default function RiskTaxonomy() {
   const [open, setOpen] = useState(false);
   const load = () => api.get("/categories").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
+
   const save = async () => {
     try {
       if (editing.id) await api.put(`/categories/${editing.id}`, editing);
@@ -23,31 +24,70 @@ export default function RiskTaxonomy() {
       toast.success("Saved"); setOpen(false); setEditing(null); load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
   };
+
+  const toggleStatus = async (c) => {
+    const next = { ...c, status: c.status === "Active" ? "Inactive" : "Active" };
+    try { await api.put(`/categories/${c.id}`, next); toast.success(`${c.name} ${next.status === "Active" ? "activated" : "deactivated"}`); load(); }
+    catch { toast.error("Failed to toggle"); }
+  };
+
+  const columns = [
+    { key: "code", header: "Code", render: (c) => <span className="font-mono text-xs text-slate-700">{c.code}</span> },
+    { key: "name", header: "Name", render: (c) => <span className="font-medium text-slate-800">{c.name}</span> },
+    { key: "description", header: "Description", render: (c) => <span className="text-slate-600 text-sm max-w-md truncate inline-block">{c.description}</span> },
+    {
+      key: "status", header: "Active", render: (c) => (
+        <div className="flex items-center gap-2">
+          <Switch checked={c.status === "Active"} onCheckedChange={() => toggleStatus(c)} data-testid={`toggle-${c.code}`} />
+          <span className={`text-xs ${c.status === "Active" ? "text-teal-700" : "text-slate-400"}`}>{c.status}</span>
+        </div>
+      )
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Risk Taxonomy</h1><p className="text-sm text-slate-500 mt-1">{list.length} categories</p></div>
-        <Button onClick={() => { setEditing({ code:"", name:"", description:"", status:"Active" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" />Add Category</Button>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Risk Taxonomy</h1>
+          <p className="text-sm text-slate-500 mt-1">Master list of risk categories used across the organisation.</p>
+        </div>
+        <Button onClick={() => { setEditing({ code:"", name:"", description:"", status:"Active" }); setOpen(true); }} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Plus className="w-4 h-4 mr-1" />Add Category
+        </Button>
       </div>
-      <Card className="overflow-hidden">
-        <table className="w-full text-sm"><thead className="bg-slate-50 border-b border-slate-200"><tr className="text-xs uppercase tracking-wider text-slate-500"><th className="text-left py-2.5 px-3">Code</th><th className="text-left py-2.5 px-3">Name</th><th className="text-left py-2.5 px-3">Description</th><th className="text-left py-2.5 px-3">Status</th><th></th></tr></thead><tbody>
-          {list.map((c) => (
-            <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-              <td className="py-2.5 px-3 font-mono text-xs">{c.code}</td><td className="py-2.5 px-3 font-medium">{c.name}</td><td className="py-2.5 px-3 text-slate-600">{c.description}</td><td className="py-2.5 px-3">{c.status}</td>
-              <td className="py-2.5 px-3"><Button size="sm" variant="outline" onClick={() => { setEditing(c); setOpen(true); }}>Edit</Button></td>
-            </tr>
-          ))}
-        </tbody></table>
-      </Card>
-      <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>{editing?.id ? "Edit" : "Add"} Category</DialogTitle></DialogHeader>
-        {editing && <div className="space-y-3">
-          <div><Label>Code</Label><Input value={editing.code} onChange={(e) => setEditing({...editing, code: e.target.value})} /></div>
-          <div><Label>Name</Label><Input value={editing.name} onChange={(e) => setEditing({...editing, name: e.target.value})} /></div>
-          <div><Label>Description</Label><Textarea value={editing.description} onChange={(e) => setEditing({...editing, description: e.target.value})} /></div>
-          <div><Label>Status</Label><Select value={editing.status} onValueChange={(v) => setEditing({...editing, status: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
-        </div>}
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-teal-600 hover:bg-teal-700">Save</Button></DialogFooter>
-      </DialogContent></Dialog>
+
+      <DataTable
+        columns={columns}
+        rows={list}
+        searchKeys={["code", "name", "description"]}
+        rowKey={(c) => c.id}
+        emptyText="No categories yet."
+        actions={(c) => (
+          <RowActions>
+            <IconAction icon={Pencil} label="Edit" tone="primary" onClick={() => { setEditing(c); setOpen(true); }} />
+          </RowActions>
+        )}
+      />
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editing?.id ? "Edit" : "Add"} Category</DialogTitle></DialogHeader>
+          {editing && <div className="space-y-3">
+            <div><Label>Code</Label><Input value={editing.code} onChange={(e) => setEditing({...editing, code: e.target.value})} /></div>
+            <div><Label>Name</Label><Input value={editing.name} onChange={(e) => setEditing({...editing, name: e.target.value})} /></div>
+            <div><Label>Description</Label><Textarea value={editing.description} onChange={(e) => setEditing({...editing, description: e.target.value})} /></div>
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <div><Label className="!mt-0">Active</Label><div className="text-xs text-slate-500">Inactive categories are hidden from new risk forms.</div></div>
+              <Switch checked={editing.status === "Active"} onCheckedChange={(v) => setEditing({...editing, status: v ? "Active" : "Inactive"})} />
+            </div>
+          </div>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} className="bg-teal-600 hover:bg-teal-700 text-white">Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
