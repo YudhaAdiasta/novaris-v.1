@@ -8,7 +8,7 @@ export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-export const api = axios.create({ baseURL: API, withCredentials: true });
+export const api = axios.create({ baseURL: API, withCredentials: false });
 
 api.interceptors.request.use((config) => {
   const t = getToken();
