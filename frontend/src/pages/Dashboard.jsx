@@ -1,0 +1,135 @@
+import React, { useEffect, useState } from "react";
+import { api, RISK_LEVEL_SOLID } from "@/lib/api";
+import { Card } from "@/components/ui/card";
+import { RiskBadge, StatusBadge } from "@/lib/badges";
+import { Link } from "react-router-dom";
+import { AlertTriangle, TrendingUp, Activity, ShieldAlert, CheckCircle2, Clock, FileWarning } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, Legend } from "recharts";
+
+const Kpi = ({ icon: Icon, label, value, tone }) => (
+  <Card className="p-5 bg-white border-slate-200">
+    <div className="flex items-start justify-between">
+      <div>
+        <div className="text-xs font-semibold tracking-wider text-slate-500 uppercase">{label}</div>
+        <div className="font-heading text-3xl font-bold text-slate-900 mt-2">{value ?? "—"}</div>
+      </div>
+      <div className={`w-9 h-9 rounded-md flex items-center justify-center ${tone}`}><Icon className="w-4 h-4" /></div>
+    </div>
+  </Card>
+);
+
+export default function Dashboard() {
+  const [data, setData] = useState(null);
+  useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); }, []);
+  if (!data) return <div className="text-slate-500">Loading dashboard…</div>;
+
+  const levelData = ["Low","Medium","High","Critical"].map((k) => ({ name: k, value: data.by_level[k] || 0 }));
+  const statusData = Object.entries(data.by_status).map(([name, value]) => ({ name, value }));
+  const catData = Object.entries(data.by_category).map(([name, value]) => ({ name, value }));
+  const trData = Object.entries(data.treatment_status).map(([name, value]) => ({ name, value }));
+
+  return (
+    <div className="space-y-6" data-testid="dashboard">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Enterprise risk posture at a glance.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <Kpi icon={Activity} label="Total Risks" value={data.total_risks} tone="bg-blue-50 text-blue-700" />
+        <Kpi icon={ShieldAlert} label="Critical" value={data.critical_risks} tone="bg-rose-50 text-rose-700" />
+        <Kpi icon={AlertTriangle} label="High" value={data.high_risks} tone="bg-orange-50 text-orange-700" />
+        <Kpi icon={TrendingUp} label="Exceeds Appetite" value={data.exceeding_appetite} tone="bg-rose-50 text-rose-700" />
+        <Kpi icon={CheckCircle2} label="Open Treatments" value={data.open_treatments} tone="bg-purple-50 text-purple-700" />
+        <Kpi icon={FileWarning} label="Overdue" value={data.overdue_treatments} tone="bg-rose-50 text-rose-700" />
+        <Kpi icon={Clock} label="Pending Approvals" value={data.pending_approvals} tone="bg-amber-50 text-amber-700" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-5">
+          <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Risk by Level (Residual)</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={levelData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4,4,0,0]}>
+                  {levelData.map((d, i) => <Cell key={i} fill={RISK_LEVEL_SOLID[d.name]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Risk by Category</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={catData} dataKey="value" nameKey="name" outerRadius={90} label={{ fontSize: 11 }}>
+                  {catData.map((_, i) => <Cell key={i} fill={["#0052CC","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Risk by Status</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={statusData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} width={130} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#0052CC" radius={[0,4,4,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Treatment Plan Status</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={trData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#8B5CF6" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-5">
+        <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Top 10 Highest Residual Risks</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500"><th className="text-left py-2 px-3">Risk ID</th><th className="text-left py-2 px-3">Title</th><th className="text-left py-2 px-3">Residual</th><th className="text-left py-2 px-3">Score</th><th className="text-left py-2 px-3">Status</th></tr></thead>
+            <tbody>
+              {data.top_residual.map((r) => (
+                <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-2 px-3 font-mono text-xs"><Link to={`/risks/${r.id}`} className="text-blue-700 hover:underline">{r.risk_id}</Link></td>
+                  <td className="py-2 px-3">{r.title}</td>
+                  <td className="py-2 px-3"><RiskBadge level={r.residual_level} /></td>
+                  <td className="py-2 px-3 font-mono">{r.residual_score}</td>
+                  <td className="py-2 px-3"><StatusBadge status={r.status} /></td>
+                </tr>
+              ))}
+              {data.top_residual.length === 0 && <tr><td colSpan="5" className="py-6 text-center text-slate-400">No risks yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}

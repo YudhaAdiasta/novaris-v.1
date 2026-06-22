@@ -1,0 +1,32 @@
+{
+  "summary": "Comprehensive backend + frontend testing for NOVARIS MVP. 17/17 pytest backend tests passed covering auth (all 5 demo users), seed data, dashboard, RBAC, full risk workflow (create→submit→approve→treatment→complete→validate), risk return, audit trail, CSV export. Frontend verified: admin login redirects to dashboard, KPIs render (Total 6, Critical 1, High 1, Exceeds Appetite 4), charts render, sidebar shows Administration section for admin (Risk Taxonomy, Scoring Matrix, Risk Appetite, Users & Roles), Risk Register lists RSK-coded items, CSV export downloads risk_register.csv successfully. All admin pages (/admin/taxonomy, /admin/matrix, /admin/appetite, /admin/users) load without errors. Audit Trail and Approval Tasks pages load.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recharts emits width(-1)/height(-1) console warnings on initial render before container measures; visual output is fine. Consider adding minHeight to ResponsiveContainer parents."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_novaris_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: Suppress recharts ResponsiveContainer width(-1) warnings by setting explicit minHeight on chart wrappers.",
+    "Optional polish: bcrypt + cookie config uses samesite='none' + secure=true which is correct for cross-site preview, but verify in production deployment."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 727 lines and contains everything (routes, models, seed, auth). Consider splitting into routers/auth/seed modules for maintainability (file >700 LOC threshold).",
+    "Uses deprecated FastAPI @app.on_event('startup'/'shutdown') - migrate to lifespan context manager.",
+    "Risk creation generates control IDs on every PUT update (line 336) which replaces stable IDs - may break references; consider preserving existing control ids when updating.",
+    "PUT /risks/{rid} appends new id to controls but enrich runs on merged dict - works but residual recalc only happens because residual_l/i are in payload; ok currently.",
+    "/treatments POST is open to any authenticated user including viewer - consider role guard (require_roles admin/risk_owner/risk_officer).",
+    "/risks/{rid}/close requires officer/admin but other state mutations like submit allow any user; tighten to owner/admin/officer.",
+    "CORS allow_origins uses FRONTEND_URL env that is not present; preview backend would fail credentialed requests if origin differs from REACT_APP_BACKEND_URL. Current testing worked because requests are server-to-server / same-host."
+  ],
+  "updated_files": ["/app/backend/tests/test_novaris_api.py (new)"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% on tested flows"},
+  "test_credentials": "Loaded from /app/memory/test_credentials.md - all 5 users authenticate successfully.",
+  "seed_data_creation": "Backend auto-seeds 5 users, 8 categories, 8 appetites, 5x5 matrix, 4 sample risks on startup. Verified via API and dashboard (6 risks total after 2 TEST_ risks created by tests).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 13 modules functional end-to-end. test_novaris_api.py provides regression coverage for entire workflow. Test-created risks (TEST_workflow_risk, TEST_return) remain in DB for future inspection - safe to leave or cleanup. Recharts warnings are non-blocking. Login page already auto-redirects authenticated users so logout step required in scripted multi-user UI flows."
+}
