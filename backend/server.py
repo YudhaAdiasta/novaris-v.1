@@ -680,6 +680,202 @@ async def dashboard_advanced(user=Depends(get_current_user)):
         "recent_incidents": incidents[:10],
     }
 
+# --- PHASE 3 ---
+class CommitteeIn(BaseModel):
+    name: str; type: str = "Risk Committee"; description: str = ""
+    chairperson: str = ""; secretary: str = ""; members: List[str] = []
+    meeting_frequency: str = "Monthly"; status: str = "Active"
+
+class MeetingIn(BaseModel):
+    committee_id: str; title: str; meeting_date: str
+    start_time: str = ""; end_time: str = ""; location: str = ""
+    agenda: List[Dict[str, Any]] = []; attendees: List[str] = []; absentees: List[str] = []
+    status: str = "Scheduled"; minutes: str = ""
+    decisions: List[Dict[str, Any]] = []; follow_ups: List[Dict[str, Any]] = []
+
+class ObligationIn(BaseModel):
+    title: str; description: str = ""; obligation_type: str = "Regulatory"
+    regulator: str = ""; regulation_ref: str = ""; category_id: Optional[str] = None
+    related_risk_id: Optional[str] = None; owner_id: str = ""
+    frequency: str = "Quarterly"; due_date: str = ""; reminder_days: int = 14
+    status: str = "Not Started"; submission_date: str = ""
+    evidence_notes: str = ""; remarks: str = ""
+
+class ControlTestIn(BaseModel):
+    risk_id: str; control_id: str = ""; test_period: str = ""
+    test_type: str = "Combined Test"; test_procedure: str = ""
+    tester: str = ""; sample_size: int = 0; sample_description: str = ""
+    test_result: str = "Not Tested"; findings: str = ""; evidence_notes: str = ""
+    deficiency: bool = False; remediation_required: bool = False
+    remediation_action: str = ""; remediation_owner: str = ""; remediation_due_date: str = ""
+    status: str = "Draft"
+
+class AcceptanceIn(BaseModel):
+    request_type: str = "Risk Acceptance"; related_risk_id: Optional[str] = None
+    related_object_type: str = "Risk"; related_object_id: str = ""
+    title: str; justification: str = ""; residual_risk_level: str = "Medium"
+    appetite_level: str = "Medium"; reason: str = ""; compensating_controls: str = ""
+    effective_date: str = ""; expiry_date: str = ""
+    status: str = "Draft"; approval_notes: str = ""; closure_remarks: str = ""
+
+def _crud(coll, audit_label):
+    async def _list(user=Depends(get_current_user)): return await coll.find({}, {"_id": 0}).to_list(2000)
+    return _list
+
+@api.get("/committees")
+async def list_committees(user=Depends(get_current_user)):
+    return await db.committees.find({}, {"_id": 0}).to_list(200)
+
+@api.post("/committees")
+async def create_committee(body: CommitteeIn, user=Depends(require_roles("admin","risk_officer"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
+    await db.committees.insert_one(doc)
+    await audit(user, "Committee Created", "Committee", doc["id"], None, {"name": doc["name"]})
+    doc.pop("_id", None); return doc
+
+@api.put("/committees/{cid}")
+async def update_committee(cid: str, body: CommitteeIn, user=Depends(require_roles("admin","risk_officer"))):
+    await db.committees.update_one({"id": cid}, {"$set": body.model_dump()})
+    await audit(user, "Committee Updated", "Committee", cid)
+    return await db.committees.find_one({"id": cid}, {"_id": 0})
+
+@api.get("/meetings")
+async def list_meetings(user=Depends(get_current_user)):
+    return await db.meetings.find({}, {"_id": 0}).sort("meeting_date", -1).to_list(500)
+
+@api.post("/meetings")
+async def create_meeting(body: MeetingIn, user=Depends(require_roles("admin","risk_officer"))):
+    n = await db.meetings.count_documents({})
+    doc = body.model_dump(); doc.update({"id": new_id(), "meeting_code": f"MTG-{3000+n+1}",
+        "created_by": user["id"], "created_at": now_iso(), "updated_at": now_iso()})
+    await db.meetings.insert_one(doc)
+    await audit(user, "Meeting Created", "Meeting", doc["id"], None, {"title": doc["title"]})
+    doc.pop("_id", None); return doc
+
+@api.put("/meetings/{mid}")
+async def update_meeting(mid: str, body: MeetingIn, user=Depends(require_roles("admin","risk_officer"))):
+    payload = body.model_dump(); payload["updated_at"] = now_iso()
+    await db.meetings.update_one({"id": mid}, {"$set": payload})
+    await audit(user, "Meeting Updated", "Meeting", mid, None, {"status": payload.get("status")})
+    return await db.meetings.find_one({"id": mid}, {"_id": 0})
+
+@api.get("/obligations")
+async def list_obligations(user=Depends(get_current_user)):
+    items = await db.obligations.find({}, {"_id": 0}).to_list(1000)
+    today_s = datetime.now(timezone.utc).date().isoformat()
+    for o in items:
+        if o.get("due_date") and o["due_date"] < today_s and o.get("status") not in ("Submitted","Approved","Waived"):
+            o["status"] = "Overdue"
+    return items
+
+@api.post("/obligations")
+async def create_obligation(body: ObligationIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso(), "updated_at": now_iso()})
+    await db.obligations.insert_one(doc)
+    await audit(user, "Obligation Created", "Obligation", doc["id"], None, {"title": doc["title"]})
+    doc.pop("_id", None); return doc
+
+@api.put("/obligations/{oid}")
+async def update_obligation(oid: str, body: ObligationIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    old = await db.obligations.find_one({"id": oid}, {"_id": 0})
+    payload = body.model_dump(); payload["updated_at"] = now_iso()
+    await db.obligations.update_one({"id": oid}, {"$set": payload})
+    await audit(user, "Obligation Updated", "Obligation", oid, {"status": old.get("status") if old else None}, {"status": payload.get("status")})
+    return {**(old or {}), **payload}
+
+@api.get("/control-tests")
+async def list_tests(user=Depends(get_current_user)):
+    return await db.control_tests.find({}, {"_id": 0}).to_list(1000)
+
+@api.post("/control-tests")
+async def create_test(body: ControlTestIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso(), "updated_at": now_iso()})
+    await db.control_tests.insert_one(doc)
+    # If failed, mark control ineffective
+    if doc.get("test_result") == "Failed" and doc.get("control_id"):
+        await db.risks.update_one({"id": doc["risk_id"], "controls.id": doc["control_id"]},
+            {"$set": {"controls.$.operating_effectiveness": "Ineffective", "controls.$.overall_effectiveness": "Ineffective"}})
+    await audit(user, "Control Test Created", "ControlTest", doc["id"], None, {"result": doc["test_result"]})
+    doc.pop("_id", None); return doc
+
+@api.put("/control-tests/{tid}")
+async def update_test(tid: str, body: ControlTestIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    payload = body.model_dump(); payload["updated_at"] = now_iso()
+    await db.control_tests.update_one({"id": tid}, {"$set": payload})
+    await audit(user, "Control Test Updated", "ControlTest", tid, None, {"result": payload.get("test_result")})
+    return await db.control_tests.find_one({"id": tid}, {"_id": 0})
+
+@api.get("/acceptances")
+async def list_acceptances(risk_id: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"related_risk_id": risk_id} if risk_id else {}
+    items = await db.acceptances.find(q, {"_id": 0}).to_list(1000)
+    today_s = datetime.now(timezone.utc).date().isoformat()
+    for a in items:
+        if a.get("expiry_date") and a["expiry_date"] < today_s and a.get("status") == "Approved":
+            a["status"] = "Expired"
+    return items
+
+@api.post("/acceptances")
+async def create_acceptance(body: AcceptanceIn, user=Depends(get_current_user)):
+    doc = body.model_dump(); doc.update({"id": new_id(), "requested_by": user["id"],
+        "requested_by_name": user["name"], "created_at": now_iso(), "updated_at": now_iso()})
+    await db.acceptances.insert_one(doc)
+    await audit(user, "Risk Acceptance Created", "Acceptance", doc["id"], None, {"title": doc["title"]})
+    doc.pop("_id", None); return doc
+
+@api.post("/acceptances/{aid}/submit")
+async def submit_acceptance(aid: str, user=Depends(get_current_user)):
+    a = await db.acceptances.find_one({"id": aid}, {"_id": 0})
+    if not a: raise HTTPException(404, "Not found")
+    await db.acceptances.update_one({"id": aid}, {"$set": {"status": "Submitted", "updated_at": now_iso()}})
+    target = "approver" if a.get("residual_risk_level") in ("High","Critical") else "risk_officer"
+    await _notify_role(target, f"Risk acceptance pending: {a['title']}", "Acceptance", aid)
+    await audit(user, "Risk Acceptance Submitted", "Acceptance", aid)
+    return {"ok": True}
+
+@api.post("/acceptances/{aid}/approve")
+async def approve_acceptance(aid: str, body: ApprovalAction, user=Depends(require_roles("admin","risk_officer","approver"))):
+    a = await db.acceptances.find_one({"id": aid}, {"_id": 0})
+    if not a: raise HTTPException(404, "Not found")
+    if a.get("residual_risk_level") in ("High","Critical") and user["role"] not in ("approver","admin"):
+        raise HTTPException(403, "High/Critical acceptance requires Approver or Admin")
+    await db.acceptances.update_one({"id": aid}, {"$set": {"status": "Approved", "approval_notes": body.notes, "updated_at": now_iso()}})
+    await audit(user, "Risk Acceptance Approved", "Acceptance", aid, None, None, body.notes)
+    return {"ok": True}
+
+@api.post("/acceptances/{aid}/reject")
+async def reject_acceptance(aid: str, body: ApprovalAction, user=Depends(require_roles("admin","risk_officer","approver"))):
+    await db.acceptances.update_one({"id": aid}, {"$set": {"status": "Rejected", "approval_notes": body.notes, "updated_at": now_iso()}})
+    await audit(user, "Risk Acceptance Rejected", "Acceptance", aid, None, None, body.notes)
+    return {"ok": True}
+
+@api.get("/dashboard/phase3")
+async def dashboard_phase3(user=Depends(get_current_user)):
+    today_s = datetime.now(timezone.utc).date().isoformat()
+    in30 = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
+    meetings = await db.meetings.find({}, {"_id": 0}).to_list(500)
+    upcoming_meetings = [m for m in meetings if m.get("meeting_date","") >= today_s and m.get("status") not in ("Completed","Cancelled")]
+    obligations = await db.obligations.find({}, {"_id": 0}).to_list(1000)
+    overdue_obl = [o for o in obligations if o.get("due_date") and o["due_date"] < today_s and o.get("status") not in ("Submitted","Approved","Waived")]
+    upcoming_obl = [o for o in obligations if o.get("due_date") and today_s <= o["due_date"] <= in30]
+    tests = await db.control_tests.find({}, {"_id": 0}).to_list(1000)
+    failed_tests = [t for t in tests if t.get("test_result") == "Failed"]
+    open_deficiencies = [t for t in tests if t.get("deficiency") and t.get("status") not in ("Closed",)]
+    acceptances = await db.acceptances.find({}, {"_id": 0}).to_list(1000)
+    active_acc = [a for a in acceptances if a.get("status") == "Approved" and (not a.get("expiry_date") or a["expiry_date"] >= today_s)]
+    expiring_acc = [a for a in active_acc if a.get("expiry_date") and a["expiry_date"] <= in30]
+    return {
+        "upcoming_meetings": len(upcoming_meetings),
+        "overdue_obligations": len(overdue_obl),
+        "upcoming_obligations": len(upcoming_obl),
+        "tests_total": len(tests),
+        "tests_failed": len(failed_tests),
+        "open_deficiencies": len(open_deficiencies),
+        "active_acceptances": len(active_acc),
+        "expiring_acceptances": len(expiring_acc),
+        "high_critical_accepted": sum(1 for a in active_acc if a.get("residual_risk_level") in ("High","Critical")),
+    }
+
 # --- Audit ---
 @api.get("/audit")
 async def list_audit(user=Depends(get_current_user)):

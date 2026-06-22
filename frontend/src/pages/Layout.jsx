@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ROLE_LABELS } from "@/lib/api";
-import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Settings2, Users, Sliders, Target, LogOut, ChevronDown, Activity, AlertOctagon, Calendar, Bell, GitBranch } from "lucide-react";
+import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Settings2, Users, Sliders, Target, LogOut, ChevronDown, Activity, AlertOctagon, Calendar, Bell, GitBranch, Briefcase, Scale, ClipboardList, FileCheck, Wrench } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 const NAV = [
@@ -16,6 +16,11 @@ const NAV = [
   { to: "/incidents", label: "Incidents", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/calendar", label: "Review Calendar", icon: Calendar, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/notifications", label: "Notifications", icon: Bell, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+  { to: "/committees", label: "Committees", icon: Briefcase, roles: ["admin","risk_officer","approver","viewer"] },
+  { to: "/obligations", label: "Compliance", icon: Scale, roles: ["admin","risk_officer","risk_owner","viewer"] },
+  { to: "/control-testing", label: "Control Testing", icon: FileCheck, roles: ["admin","risk_officer","risk_owner","viewer"] },
+  { to: "/acceptances", label: "Risk Acceptance", icon: ClipboardList, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+  { to: "/report-builder", label: "Report Builder", icon: Wrench, roles: ["admin","risk_officer","approver","viewer"] },
   { to: "/reports", label: "Reports", icon: FileBarChart, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/audit", label: "Audit Trail", icon: History, roles: ["admin","risk_officer","viewer"] },
 ];

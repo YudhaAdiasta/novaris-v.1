@@ -21,7 +21,8 @@ const Kpi = ({ icon: Icon, label, value, tone }) => (
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [adv, setAdv] = useState(null);
-  useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); api.get("/dashboard/advanced").then((r) => setAdv(r.data)).catch(()=>{}); }, []);
+  const [p3, setP3] = useState(null);
+  useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); api.get("/dashboard/advanced").then((r) => setAdv(r.data)).catch(()=>{}); api.get("/dashboard/phase3").then((r)=>setP3(r.data)).catch(()=>{}); }, []);
   if (!data) return <div className="text-slate-500">Loading dashboard…</div>;
 
   const levelData = ["Low","Medium","High","Critical"].map((k) => ({ name: k, value: data.by_level[k] || 0 }));
@@ -57,6 +58,18 @@ export default function Dashboard() {
           <Kpi icon={TrendingUp} label="Loss YTD (IDR M)" value={Math.round((adv.incidents_loss_total||0)/1_000_000)} tone="bg-rose-50 text-rose-700" />
           <Kpi icon={Clock} label="Reviews ≤ 7d" value={adv.upcoming_reviews_7d} tone="bg-amber-50 text-amber-700" />
           <Kpi icon={FileWarning} label="Overdue Reviews" value={adv.overdue_reviews} tone="bg-rose-50 text-rose-700" />
+        </div>
+      )}
+
+      {p3 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <Kpi icon={Activity} label="Upcoming Meetings" value={p3.upcoming_meetings} tone="bg-blue-50 text-blue-700" />
+          <Kpi icon={AlertTriangle} label="Overdue Obligations" value={p3.overdue_obligations} tone="bg-rose-50 text-rose-700" />
+          <Kpi icon={Clock} label="Obligations ≤ 30d" value={p3.upcoming_obligations} tone="bg-amber-50 text-amber-700" />
+          <Kpi icon={ShieldAlert} label="Failed Tests" value={p3.tests_failed} tone="bg-rose-50 text-rose-700" />
+          <Kpi icon={FileWarning} label="Open Deficiencies" value={p3.open_deficiencies} tone="bg-orange-50 text-orange-700" />
+          <Kpi icon={CheckCircle2} label="Active Acceptances" value={p3.active_acceptances} tone="bg-purple-50 text-purple-700" />
+          <Kpi icon={TrendingUp} label="Expiring ≤ 30d" value={p3.expiring_acceptances} tone="bg-amber-50 text-amber-700" />
         </div>
       )}
 

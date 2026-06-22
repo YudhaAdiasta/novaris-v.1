@@ -46,6 +46,11 @@ function AppRoutes() {
         <Route path="incidents" element={<Incidents />} />
         <Route path="calendar" element={<ReviewCalendar />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="committees" element={<Committees />} />
+        <Route path="obligations" element={<Obligations />} />
+        <Route path="control-testing" element={<ControlTesting />} />
+        <Route path="acceptances" element={<Acceptances />} />
+        <Route path="report-builder" element={<ReportBuilder />} />
         <Route path="admin/escalation" element={<Private roles={["admin"]}><EscalationMatrix /></Private>} />
         <Route path="approvals" element={<Private roles={["admin","risk_officer","approver"]}><ApprovalTasks /></Private>} />
         <Route path="reports" element={<Reports />} />
