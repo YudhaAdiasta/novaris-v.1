@@ -15,7 +15,7 @@ export default function RiskTaxonomy() {
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
   const load = () => api.get("/categories").then((r) => setList(r.data));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
   const save = async () => {
     try {
       if (editing.id) await api.put(`/categories/${editing.id}`, editing);
