@@ -8,19 +8,18 @@ import { Card } from "@/components/ui/card";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const DEMO = [
-  { role: "Admin", email: "admin@demo.com", password: "Admin@123" },
-  { role: "Risk Officer", email: "riskofficer@demo.com", password: "Officer@123" },
-  { role: "Risk Owner", email: "riskowner@demo.com", password: "Owner@123" },
-  { role: "Approver", email: "approver@demo.com", password: "Approver@123" },
-  { role: "Viewer / Auditor", email: "auditor@demo.com", password: "Viewer@123" },
-];
+const DEMO = (() => {
+  try {
+    if (process.env.REACT_APP_DEMO_ACCOUNTS) return JSON.parse(process.env.REACT_APP_DEMO_ACCOUNTS);
+  } catch {}
+  return [];
+})();
 
 export default function Login() {
   const { user, login } = useAuth();
   const nav = useNavigate();
-  const [email, setEmail] = useState("admin@demo.com");
-  const [password, setPassword] = useState("Admin@123");
+  const [email, setEmail] = useState(DEMO[0]?.email || "");
+  const [password, setPassword] = useState(DEMO[0]?.password || "");
   const [busy, setBusy] = useState(false);
 
   if (user) return <Navigate to="/" replace />;
