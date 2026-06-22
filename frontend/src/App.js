@@ -13,6 +13,11 @@ import TreatmentPlans from "@/pages/TreatmentPlans";
 import ApprovalTasks from "@/pages/ApprovalTasks";
 import Reports from "@/pages/Reports";
 import AuditTrail from "@/pages/AuditTrail";
+import KRI from "@/pages/KRI";
+import Incidents from "@/pages/Incidents";
+import ReviewCalendar from "@/pages/ReviewCalendar";
+import Notifications from "@/pages/Notifications";
+import EscalationMatrix from "@/pages/admin/EscalationMatrix";
 import RiskTaxonomy from "@/pages/admin/RiskTaxonomy";
 import ScoringMatrix from "@/pages/admin/ScoringMatrix";
 import RiskAppetite from "@/pages/admin/RiskAppetite";
@@ -37,6 +42,11 @@ function AppRoutes() {
         <Route path="risks/:id" element={<RiskDetail />} />
         <Route path="risks/:id/edit" element={<Private roles={["admin","risk_owner","risk_officer"]}><RiskForm /></Private>} />
         <Route path="treatments" element={<TreatmentPlans />} />
+        <Route path="kris" element={<KRI />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="calendar" element={<ReviewCalendar />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="admin/escalation" element={<Private roles={["admin"]}><EscalationMatrix /></Private>} />
         <Route path="approvals" element={<Private roles={["admin","risk_officer","approver"]}><ApprovalTasks /></Private>} />
         <Route path="reports" element={<Reports />} />
         <Route path="audit" element={<AuditTrail />} />

@@ -492,6 +492,194 @@ async def list_approvals(user=Depends(get_current_user)):
     tasks = await db.approval_tasks.find(q, {"_id": 0}).sort("submitted_date", -1).to_list(500)
     return tasks
 
+# --- PHASE 2: KRI, Incidents, Calendar, Escalation, Notifications ---
+
+class KriIn(BaseModel):
+    name: str
+    risk_id: Optional[str] = None
+    category_id: Optional[str] = None
+    unit: str = ""
+    frequency: str = "Monthly"
+    threshold_green: float = 0
+    threshold_amber: float = 0
+    threshold_red: float = 0
+    current_value: float = 0
+    direction: str = "higher_is_worse"
+    owner_id: str = ""
+    description: str = ""
+
+def kri_status(k):
+    v = float(k.get("current_value", 0))
+    a, r = float(k.get("threshold_amber", 0)), float(k.get("threshold_red", 0))
+    if k.get("direction") == "lower_is_worse":
+        if v <= r: return "Red"
+        if v <= a: return "Amber"
+        return "Green"
+    if v >= r: return "Red"
+    if v >= a: return "Amber"
+    return "Green"
+
+async def _notify_role(role, message, object_type, object_id):
+    users_ = await db.users.find({"role": role}, {"_id": 0}).to_list(50)
+    for u in users_:
+        await db.notifications.insert_one({"id": new_id(), "user_id": u["id"], "message": message,
+            "object_type": object_type, "object_id": object_id, "read": False, "created_at": now_iso()})
+
+@api.get("/kris")
+async def list_kris(user=Depends(get_current_user)):
+    items = await db.kris.find({}, {"_id": 0}).to_list(500)
+    for k in items: k["status"] = kri_status(k)
+    return items
+
+@api.post("/kris")
+async def create_kri(body: KriIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "history": [], "created_at": now_iso(), "updated_at": now_iso()})
+    doc["status"] = kri_status(doc)
+    await db.kris.insert_one(doc)
+    await audit(user, "KRI Created", "KRI", doc["id"], None, {"name": doc["name"]})
+    doc.pop("_id", None); return doc
+
+@api.put("/kris/{kid}")
+async def update_kri(kid: str, body: KriIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    old = await db.kris.find_one({"id": kid}, {"_id": 0})
+    if not old: raise HTTPException(404, "Not found")
+    payload = body.model_dump(); payload["updated_at"] = now_iso()
+    payload["status"] = kri_status({**old, **payload})
+    hist = old.get("history", [])
+    if float(old.get("current_value", 0)) != float(payload.get("current_value", 0)):
+        hist.append({"value": payload["current_value"], "status": payload["status"], "at": now_iso(), "by": user["name"]})
+        payload["history"] = hist[-50:]
+    await db.kris.update_one({"id": kid}, {"$set": payload})
+    await audit(user, "KRI Updated", "KRI", kid, {"v": old.get("current_value")}, {"v": payload.get("current_value")})
+    if payload["status"] in ("Amber", "Red"):
+        await _notify_role("risk_officer", f"KRI '{old['name']}' breached: {payload['status']}", "KRI", kid)
+    return {**old, **payload}
+
+@api.delete("/kris/{kid}")
+async def delete_kri(kid: str, user=Depends(require_roles("admin"))):
+    await db.kris.delete_one({"id": kid}); await audit(user, "KRI Deleted", "KRI", kid); return {"ok": True}
+
+class IncidentIn(BaseModel):
+    title: str
+    description: str = ""
+    category_id: Optional[str] = None
+    related_risk_id: Optional[str] = None
+    business_unit: str = ""
+    occurrence_date: str = ""
+    severity: str = "Medium"
+    status: str = "Reported"
+    financial_loss: float = 0
+    root_cause: str = ""
+    corrective_actions: str = ""
+
+@api.get("/incidents")
+async def list_incidents(user=Depends(get_current_user)):
+    return await db.incidents.find({}, {"_id": 0}).sort("occurrence_date", -1).to_list(1000)
+
+@api.post("/incidents")
+async def create_incident(body: IncidentIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    n = await db.incidents.count_documents({})
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "incident_code": f"INC-{2000+n+1}", "reported_by": user["id"],
+                "reported_by_name": user["name"], "reported_at": now_iso(),
+                "created_at": now_iso(), "updated_at": now_iso()})
+    await db.incidents.insert_one(doc)
+    await audit(user, "Incident Created", "Incident", doc["id"], None, {"title": doc["title"]})
+    if doc["severity"] in ("High", "Critical"):
+        await _notify_role("risk_officer", f"{doc['severity']} incident: {doc['title']}", "Incident", doc["id"])
+    doc.pop("_id", None); return doc
+
+@api.put("/incidents/{iid}")
+async def update_incident(iid: str, body: IncidentIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    old = await db.incidents.find_one({"id": iid}, {"_id": 0})
+    if not old: raise HTTPException(404, "Not found")
+    payload = body.model_dump(); payload["updated_at"] = now_iso()
+    await db.incidents.update_one({"id": iid}, {"$set": payload})
+    await audit(user, "Incident Updated", "Incident", iid, {"status": old.get("status")}, {"status": payload.get("status")})
+    return {**old, **payload}
+
+@api.get("/calendar")
+async def calendar_events(start: Optional[str] = None, end: Optional[str] = None, user=Depends(get_current_user)):
+    events = []
+    risks = await db.risks.find({}, {"_id": 0}).to_list(2000)
+    for r in risks:
+        if r.get("next_review_date"):
+            events.append({"id": f"rev-{r['id']}", "type": "Risk Review", "title": r["title"],
+                           "date": r["next_review_date"], "ref_id": r["id"], "ref_code": r.get("risk_id"),
+                           "level": r.get("residual_level"), "status": r.get("status")})
+    treatments = await db.treatment_plans.find({}, {"_id": 0}).to_list(2000)
+    for t in treatments:
+        if t.get("target_completion_date") and t.get("status") not in ("Closed",):
+            events.append({"id": f"trt-{t['id']}", "type": "Treatment Due",
+                           "title": t.get("action_description") or "Treatment Action",
+                           "date": t["target_completion_date"], "ref_id": t["risk_id"], "status": t.get("status")})
+    if start: events = [e for e in events if e["date"] >= start]
+    if end: events = [e for e in events if e["date"] <= end]
+    events.sort(key=lambda e: e["date"])
+    return events
+
+class EscalationIn(BaseModel):
+    risk_level: str
+    notify_role: str
+    days_to_escalate: int = 7
+    description: str = ""
+
+@api.get("/escalations")
+async def list_escalations(user=Depends(get_current_user)):
+    return await db.escalations.find({}, {"_id": 0}).to_list(100)
+
+@api.post("/escalations")
+async def create_escalation(body: EscalationIn, user=Depends(require_roles("admin"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
+    await db.escalations.insert_one(doc)
+    await audit(user, "Configuration Changed", "Escalation", doc["id"], None, doc)
+    doc.pop("_id", None); return doc
+
+@api.delete("/escalations/{eid}")
+async def delete_escalation(eid: str, user=Depends(require_roles("admin"))):
+    await db.escalations.delete_one({"id": eid}); return {"ok": True}
+
+@api.get("/notifications")
+async def list_notifications(user=Depends(get_current_user)):
+    return await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+@api.post("/notifications/{nid}/read")
+async def mark_read(nid: str, user=Depends(get_current_user)):
+    await db.notifications.update_one({"id": nid, "user_id": user["id"]}, {"$set": {"read": True}}); return {"ok": True}
+
+@api.post("/notifications/read-all")
+async def mark_all_read(user=Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}}); return {"ok": True}
+
+@api.get("/dashboard/advanced")
+async def dashboard_advanced(user=Depends(get_current_user)):
+    today_d = datetime.now(timezone.utc).date(); today_s = today_d.isoformat()
+    in7 = (today_d + timedelta(days=7)).isoformat()
+    in30 = (today_d + timedelta(days=30)).isoformat()
+    risks = await db.risks.find({}, {"_id": 0}).to_list(2000)
+    kris = await db.kris.find({}, {"_id": 0}).to_list(500)
+    for k in kris: k["status"] = kri_status(k)
+    incidents = await db.incidents.find({}, {"_id": 0}).to_list(1000)
+    upcoming = [r for r in risks if r.get("next_review_date") and today_s <= r["next_review_date"] <= in30]
+    overdue_rev = [r for r in risks if r.get("next_review_date") and r["next_review_date"] < today_s and r.get("status") not in ("Closed",)]
+    sev: Dict[str, int] = {}
+    for i in incidents: sev[i.get("severity", "Medium")] = sev.get(i.get("severity", "Medium"), 0) + 1
+    return {
+        "kri_total": len(kris),
+        "kri_red": sum(1 for k in kris if k["status"] == "Red"),
+        "kri_amber": sum(1 for k in kris if k["status"] == "Amber"),
+        "kri_green": sum(1 for k in kris if k["status"] == "Green"),
+        "incidents_total": len(incidents),
+        "incidents_open": sum(1 for i in incidents if i.get("status") not in ("Closed","Resolved")),
+        "incidents_loss_total": sum(float(i.get("financial_loss") or 0) for i in incidents),
+        "incidents_severity": sev,
+        "upcoming_reviews_7d": sum(1 for r in upcoming if r["next_review_date"] <= in7),
+        "upcoming_reviews_30d": len(upcoming),
+        "overdue_reviews": len(overdue_rev),
+        "top_kris": sorted(kris, key=lambda k: {"Red":0,"Amber":1,"Green":2}.get(k["status"], 3))[:10],
+        "recent_incidents": incidents[:10],
+    }
+
 # --- Audit ---
 @api.get("/audit")
 async def list_audit(user=Depends(get_current_user)):
@@ -701,6 +889,43 @@ async def seed_all():
             }
             doc = _enrich_risk(doc)
             await db.risks.insert_one(doc)
+
+    # Phase 2 seed
+    if await db.escalations.count_documents({}) == 0:
+        for lvl, role, days in [("Critical","approver",1),("High","risk_officer",3),("Medium","risk_owner",7),("Low","risk_owner",14)]:
+            await db.escalations.insert_one({"id": new_id(), "risk_level": lvl, "notify_role": role,
+                "days_to_escalate": days, "description": f"Escalate {lvl} risks to {role} within {days} day(s)",
+                "created_at": now_iso()})
+    if await db.kris.count_documents({}) == 0:
+        owner = await db.users.find_one({"role": "risk_owner"})
+        oid = owner["id"] if owner else ""
+        for k in [
+            {"name":"Investment concentration ratio","unit":"%","threshold_green":15,"threshold_amber":20,"threshold_red":25,"current_value":22},
+            {"name":"Regulatory report submission delay","unit":"days","threshold_green":1,"threshold_amber":3,"threshold_red":5,"current_value":2},
+            {"name":"Core system availability","unit":"%","threshold_green":99.5,"threshold_amber":98,"threshold_red":95,"current_value":99.2,"direction":"lower_is_worse"},
+            {"name":"Member data accuracy","unit":"%","threshold_green":99,"threshold_amber":97,"threshold_red":95,"current_value":98.5,"direction":"lower_is_worse"},
+        ]:
+            d = {"id": new_id(), "name": k["name"], "unit": k["unit"], "frequency":"Monthly",
+                 "threshold_green": k["threshold_green"], "threshold_amber": k["threshold_amber"],
+                 "threshold_red": k["threshold_red"], "current_value": k["current_value"],
+                 "direction": k.get("direction","higher_is_worse"), "owner_id": oid,
+                 "history": [], "description":"", "created_at": now_iso(), "updated_at": now_iso()}
+            d["status"] = kri_status(d)
+            await db.kris.insert_one(d)
+    if await db.incidents.count_documents({}) == 0:
+        owner = await db.users.find_one({"role": "risk_owner"})
+        oid = owner["id"] if owner else ""
+        for n, (title, sev, loss, status) in enumerate([
+            ("Pension payment delay due to bank file rejection","High",125000000,"Resolved"),
+            ("Phishing email targeted finance team","Medium",0,"Investigating"),
+            ("Member data leak from misconfigured report export","Critical",500000000,"Reported"),
+        ]):
+            await db.incidents.insert_one({"id": new_id(), "incident_code": f"INC-{2001+n}",
+                "title": title, "description": title, "business_unit": "Operations",
+                "occurrence_date": "2026-02-01", "severity": sev, "status": status,
+                "financial_loss": loss, "root_cause":"", "corrective_actions":"",
+                "reported_by": oid, "reported_by_name":"Owen Owner", "reported_at": now_iso(),
+                "created_at": now_iso(), "updated_at": now_iso()})
 
 # --- Lifecycle ---
 @app.on_event("startup")

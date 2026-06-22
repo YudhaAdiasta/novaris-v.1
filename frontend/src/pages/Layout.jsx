@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ROLE_LABELS } from "@/lib/api";
-import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Settings2, Users, Sliders, Target, LogOut, ChevronDown } from "lucide-react";
+import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Settings2, Users, Sliders, Target, LogOut, ChevronDown, Activity, AlertOctagon, Calendar, Bell, GitBranch } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 const NAV = [
@@ -12,6 +12,10 @@ const NAV = [
   { to: "/risks/new", label: "Create Risk", icon: PlusCircle, roles: ["admin","risk_officer","risk_owner"] },
   { to: "/approvals", label: "Approval Tasks", icon: ClipboardCheck, roles: ["admin","risk_officer","approver"] },
   { to: "/treatments", label: "Treatment Plans", icon: ListChecks, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+  { to: "/kris", label: "KRIs", icon: Activity, roles: ["admin","risk_officer","risk_owner","viewer"] },
+  { to: "/incidents", label: "Incidents", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
+  { to: "/calendar", label: "Review Calendar", icon: Calendar, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+  { to: "/notifications", label: "Notifications", icon: Bell, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/reports", label: "Reports", icon: FileBarChart, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/audit", label: "Audit Trail", icon: History, roles: ["admin","risk_officer","viewer"] },
 ];
@@ -20,6 +24,7 @@ const ADMIN_NAV = [
   { to: "/admin/taxonomy", label: "Risk Taxonomy", icon: FileText },
   { to: "/admin/matrix", label: "Scoring Matrix", icon: Sliders },
   { to: "/admin/appetite", label: "Risk Appetite", icon: Target },
+  { to: "/admin/escalation", label: "Escalation Matrix", icon: GitBranch },
   { to: "/admin/users", label: "Users & Roles", icon: Users },
 ];
 

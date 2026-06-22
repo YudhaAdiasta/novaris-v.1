@@ -20,7 +20,8 @@ const Kpi = ({ icon: Icon, label, value, tone }) => (
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
-  useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); }, []);
+  const [adv, setAdv] = useState(null);
+  useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); api.get("/dashboard/advanced").then((r) => setAdv(r.data)).catch(()=>{}); }, []);
   if (!data) return <div className="text-slate-500">Loading dashboard…</div>;
 
   const levelData = ["Low","Medium","High","Critical"].map((k) => ({ name: k, value: data.by_level[k] || 0 }));
@@ -46,6 +47,18 @@ export default function Dashboard() {
         <Kpi icon={FileWarning} label="Overdue" value={data.overdue_treatments} tone="bg-rose-50 text-rose-700" />
         <Kpi icon={Clock} label="Pending Approvals" value={data.pending_approvals} tone="bg-amber-50 text-amber-700" />
       </div>
+
+      {adv && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <Kpi icon={Activity} label="KRIs Total" value={adv.kri_total} tone="bg-blue-50 text-blue-700" />
+          <Kpi icon={AlertTriangle} label="KRIs Red" value={adv.kri_red} tone="bg-rose-50 text-rose-700" />
+          <Kpi icon={AlertTriangle} label="KRIs Amber" value={adv.kri_amber} tone="bg-amber-50 text-amber-700" />
+          <Kpi icon={ShieldAlert} label="Incidents Open" value={adv.incidents_open} tone="bg-orange-50 text-orange-700" />
+          <Kpi icon={TrendingUp} label="Loss YTD (IDR M)" value={Math.round((adv.incidents_loss_total||0)/1_000_000)} tone="bg-rose-50 text-rose-700" />
+          <Kpi icon={Clock} label="Reviews ≤ 7d" value={adv.upcoming_reviews_7d} tone="bg-amber-50 text-amber-700" />
+          <Kpi icon={FileWarning} label="Overdue Reviews" value={adv.overdue_reviews} tone="bg-rose-50 text-rose-700" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-5">
