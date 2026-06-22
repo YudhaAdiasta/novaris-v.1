@@ -11,7 +11,7 @@ import { toast } from "sonner";
 const DEMO = (() => {
   try {
     if (process.env.REACT_APP_DEMO_ACCOUNTS) return JSON.parse(process.env.REACT_APP_DEMO_ACCOUNTS);
-  } catch {}
+  } catch (e) { /* fallback to empty list */ }
   return [];
 })();
 
