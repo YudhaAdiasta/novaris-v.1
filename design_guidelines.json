@@ -1,0 +1,119 @@
+{
+  "project_name": "NOVARIS - Risk Management System",
+  "theme": "light",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + Enterprise SaaS",
+  "design_philosophy": "High-trust enterprise feel for Finance/Pension. Linear/Snowflake tier design. Prioritizes data density, optical alignment, crisp typographic hierarchy, and strictly functional color usage. No decorative 'AI slop'.",
+  "colors": {
+    "background": {
+      "app": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "subtle_section": "#F1F5F9"
+    },
+    "primary": {
+      "base": "#0052CC",
+      "hover": "#0043A6",
+      "active": "#003580"
+    },
+    "text": {
+      "heading": "#0F172A",
+      "body": "#334155",
+      "muted": "#64748B",
+      "inverse": "#FFFFFF"
+    },
+    "border": {
+      "default": "#E2E8F0",
+      "focus": "#94A3B8"
+    },
+    "functional": {
+      "risk_levels": {
+        "low": {
+          "bg": "#ECFDF5",
+          "text": "#047857",
+          "solid": "#10B981"
+        },
+        "medium": {
+          "bg": "#FFFBEB",
+          "text": "#B45309",
+          "solid": "#F59E0B"
+        },
+        "high": {
+          "bg": "#FFF7ED",
+          "text": "#C2410C",
+          "solid": "#F97316"
+        },
+        "critical": {
+          "bg": "#FEF2F2",
+          "text": "#BE123C",
+          "solid": "#E11D48"
+        }
+      },
+      "appetite": {
+        "within": {
+          "bg": "#ECFDF5",
+          "text": "#047857",
+          "solid": "#10B981"
+        },
+        "exceeds": {
+          "bg": "#FEF2F2",
+          "text": "#BE123C",
+          "solid": "#E11D48"
+        }
+      }
+    }
+  },
+  "typography": {
+    "font_families": {
+      "heading": "Manrope, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-2xl font-bold tracking-tight text-slate-900",
+      "h2": "text-xl font-semibold tracking-tight text-slate-800",
+      "h3": "text-lg font-medium text-slate-800",
+      "body": "text-sm text-slate-600 leading-relaxed",
+      "small": "text-xs text-slate-500",
+      "label": "text-xs font-semibold tracking-wider text-slate-500 uppercase"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6",
+      "forms": "grid grid-cols-1 md:grid-cols-2 gap-8"
+    },
+    "surfaces": {
+      "cards": "bg-white border border-slate-200 rounded-lg shadow-sm p-5",
+      "modals": "bg-white border border-slate-200 rounded-xl shadow-xl",
+      "sidebar": "w-64 border-r border-slate-200 bg-white h-screen fixed"
+    },
+    "tables": "Dense padding (py-2 px-3), 13px/14px text size, sticky header, border-b border-slate-200 for rows."
+  },
+  "components_instructions": {
+    "charts": "Use Recharts or Shadcn charts. Use the defined risk colors (Green/Yellow/Orange/Red) consistently across all pie, bar, and trend charts. Maintain minimal grid lines.",
+    "heatmap_5x5": "Must be visually striking. Grid of 25 squares. X-axis = Impact (1-5), Y-axis = Likelihood (1-5). Colors must smoothly transition: bottom-left (Green) -> middle (Yellow/Orange) -> top-right (Red). Use 'functional.risk_levels.solid' colors.",
+    "badges": "Use soft backgrounds with darker text (e.g., bg-rose-50 text-rose-700) for inline status tags to reduce eye strain. Solid colors only for critical alerts or matrix squares.",
+    "forms": "Group sections into distinct white cards or blocks with subtle gray dividers. Inputs should have h-9 or h-10, rounded-md, text-sm.",
+    "navigation": "Sidebar must highlight active route with a subtle blue tint (bg-blue-50 text-blue-700). Top bar should be h-14, flex items-center, border-b border-slate-200, containing user profile, role, and notifications."
+  },
+  "testing_attributes": {
+    "requirement": "All interactive elements MUST include data-testid. Format: kebab-case, role-based.",
+    "examples": [
+      "data-testid=\"login-submit-button\"",
+      "data-testid=\"risk-register-table\"",
+      "data-testid=\"create-risk-button\"",
+      "data-testid=\"sidebar-nav-dashboard\""
+    ]
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "weight": "regular",
+    "instructions": "Use Phosphor Icons for a clean, dense dashboard aesthetic. Maintain 18px or 20px size for standard icons, 16px for inline data icons."
+  },
+  "media": {
+    "logo": {
+      "url": "https://images.pexels.com/photos/12843342/pexels-photo-12843342.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Abstract blue geometric pattern, cropped as a square or circle for the NOVARIS brand logo.",
+      "placement": "Top left of the sidebar, rounded-md, width 32px."
+    }
+  }
+}
