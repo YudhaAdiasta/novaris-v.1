@@ -62,3 +62,21 @@ export const ROLE_LABELS = {
 
 export const calcScore = (l, i) => Number(l) * Number(i);
 export const calcLevel = (s) => s <= 4 ? "Low" : s <= 9 ? "Medium" : s <= 15 ? "High" : "Critical";
+
+// Compact number formatter for chart labels: 184.2B, 850M, 25K
+export const formatCompact = (n) => {
+  if (n === null || n === undefined || isNaN(Number(n))) return "—";
+  const v = Number(n);
+  const abs = Math.abs(v);
+  if (abs >= 1e12) return (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+  if (abs >= 1e9)  return (v / 1e9).toFixed(1).replace(/\.0$/, "")  + "B";
+  if (abs >= 1e6)  return (v / 1e6).toFixed(1).replace(/\.0$/, "")  + "M";
+  if (abs >= 1e3)  return (v / 1e3).toFixed(1).replace(/\.0$/, "")  + "K";
+  return String(v);
+};
+
+// Comma-separated for table cells / tooltips
+export const formatNumber = (n) => {
+  if (n === null || n === undefined || isNaN(Number(n))) return "—";
+  return Number(n).toLocaleString();
+};

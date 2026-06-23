@@ -35,3 +35,6 @@ Build an enterprise risk management MVP for a Dana Pensiun / financial instituti
 - P2: Multi-period historical trend on dashboard
 - P2: PDF report export
 - P2: Bulk import via CSV
+
+## Implemented (Jun 2026)
+- Chart UI polish (P0): Added subtle bottom legends to all pie charts (Dashboard "Risk by Category" + Feed Dashboards). Money values formatted (commas for KPIs, compact B/M/K for pie labels). Fixed label overlap/clipping. Verified via screenshots.

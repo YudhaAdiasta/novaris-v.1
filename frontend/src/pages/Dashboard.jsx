@@ -82,13 +82,18 @@ export default function Dashboard() {
 
         <Card className="p-5">
           <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">Risk by Category</h3>
-          <div className="h-64">
+          <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={catData} dataKey="value" nameKey="name" outerRadius={90} label={{ fontSize: 11 }}>
-                  {catData.map((_, i) => <Cell key={i} fill={["#0D9488","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} />)}
+              <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <Pie data={catData} dataKey="value" nameKey="name" cx="50%" cy="42%" outerRadius="70%" paddingAngle={2}
+                  label={({ value }) => value > 0 ? value : ""}
+                  labelLine={{ stroke: "#CBD5E1", strokeWidth: 1 }}>
+                  {catData.map((_, i) => <Cell key={i} fill={["#0D9488","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} stroke="#fff" strokeWidth={1.5} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E8F0" }} />
+                <Legend verticalAlign="bottom" height={48} iconType="circle" iconSize={8}
+                  wrapperStyle={{ fontSize: 11, color: "#475569", paddingTop: 8 }}
+                  formatter={(label) => <span className="text-slate-600">{label}</span>} />
               </PieChart>
             </ResponsiveContainer>
           </div>

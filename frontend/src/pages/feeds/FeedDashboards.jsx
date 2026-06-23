@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { api, RISK_LEVEL_SOLID } from "@/lib/api";
+import { api, RISK_LEVEL_SOLID, formatCompact, formatNumber } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Kpi } from "@/components/Kpi";
 import { Button } from "@/components/ui/button";
@@ -203,15 +203,32 @@ function ScoringDash() {
   );
 }
 
-const Pie3 = ({ title, data }) => (
-  <Card className="p-5">
-    <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">{title}</h3>
-    {data.length === 0 ? <div className="h-64 flex items-center justify-center text-sm text-slate-400">No data yet.</div> :
-    <div className="h-64"><ResponsiveContainer><PieChart>
-      <Pie data={data} dataKey="value" nameKey="label" outerRadius={90} label={{ fontSize: 11 }}>
-        {data.map((_, i) => <Cell key={i} fill={PIE[i % PIE.length]} />)}
-      </Pie><Tooltip /></PieChart></ResponsiveContainer></div>}
-  </Card>
-);
+const Pie3 = ({ title, data, valueFormatter }) => {
+  const fmt = valueFormatter || formatCompact;
+  return (
+    <Card className="p-5">
+      <h3 className="font-heading text-base font-semibold text-slate-800 mb-4">{title}</h3>
+      {data.length === 0 ? (
+        <div className="h-64 flex items-center justify-center text-sm text-slate-400">No data yet.</div>
+      ) : (
+        <div className="h-80">
+          <ResponsiveContainer>
+            <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="42%" outerRadius="70%" innerRadius="0%" paddingAngle={2}
+                label={({ value }) => fmt(value)}
+                labelLine={{ stroke: "#CBD5E1", strokeWidth: 1 }}>
+                {data.map((_, i) => <Cell key={i} fill={PIE[i % PIE.length]} stroke="#fff" strokeWidth={1.5} />)}
+              </Pie>
+              <Tooltip formatter={(v, n) => [formatNumber(v), n]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E8F0" }} />
+              <Legend verticalAlign="bottom" height={48} iconType="circle" iconSize={8}
+                wrapperStyle={{ fontSize: 11, color: "#475569", paddingTop: 8 }}
+                formatter={(label) => <span className="text-slate-600">{label}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </Card>
+  );
+};
 
 const Skeleton = () => <div className="text-slate-400">Loading…</div>;

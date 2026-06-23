@@ -1,7 +1,7 @@
 """NOVARIS backend API tests - covers auth, risks, treatments, approvals, audit, admin"""
 import os, requests, pytest
 
-BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://risk-appetite-system.preview.emergentagent.com").rstrip("/")
+BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://novaris-erp.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
 
 CREDS = {
