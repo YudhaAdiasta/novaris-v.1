@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink, Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/api";
-import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Users, Sliders, Target, LogOut, ChevronDown, ChevronRight, Activity, AlertOctagon, Calendar, Bell, GitBranch, Briefcase, Scale, ClipboardList, FileCheck, Wrench, Home, Building2, ArrowLeftRight } from "lucide-react";
+import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Users, Sliders, Target, LogOut, ChevronDown, ChevronRight, Activity, AlertOctagon, Calendar, Bell, GitBranch, Briefcase, Scale, ClipboardList, FileCheck, Wrench, Home, Building2, ArrowLeftRight, Database, Upload, BarChart3 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 const NAV = [
@@ -20,6 +20,9 @@ const NAV = [
   { to: "/control-testing", label: "Control Testing", icon: FileCheck, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/acceptances", label: "Risk Acceptance", icon: ClipboardList, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/report-builder", label: "Report Builder", icon: Wrench, roles: ["admin","risk_officer","approver","viewer"] },
+  { to: "/feeds", label: "Data Feeds", icon: Database, roles: ["admin","risk_officer","risk_owner","viewer"] },
+  { to: "/feeds/dashboards", label: "Feed Dashboards", icon: BarChart3, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+  { to: "/feeds/breaches", label: "Feed Breaches", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/reports", label: "Reports", icon: FileBarChart, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/audit", label: "Audit Trail", icon: History, roles: ["admin","risk_officer","viewer"] },
 ];

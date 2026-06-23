@@ -19,6 +19,11 @@ import Obligations from "@/pages/Obligations";
 import ControlTesting from "@/pages/ControlTesting";
 import Acceptances from "@/pages/Acceptances";
 import ReportBuilder from "@/pages/ReportBuilder";
+import FeedBatches from "@/pages/feeds/FeedBatches";
+import FeedUploadWizard from "@/pages/feeds/FeedUploadWizard";
+import FeedBatchDetail from "@/pages/feeds/FeedBatchDetail";
+import FeedBreaches from "@/pages/feeds/FeedBreaches";
+import FeedDashboards from "@/pages/feeds/FeedDashboards";
 import Incidents from "@/pages/Incidents";
 import ReviewCalendar from "@/pages/ReviewCalendar";
 import Notifications from "@/pages/Notifications";
@@ -56,6 +61,12 @@ function AppRoutes() {
         <Route path="control-testing" element={<ControlTesting />} />
         <Route path="acceptances" element={<Acceptances />} />
         <Route path="report-builder" element={<ReportBuilder />} />
+        <Route path="feeds" element={<FeedBatches />} />
+        <Route path="feeds/upload" element={<FeedUploadWizard />} />
+        <Route path="feeds/batches/:id" element={<FeedBatchDetail />} />
+        <Route path="feeds/breaches" element={<FeedBreaches />} />
+        <Route path="feeds/dashboards" element={<FeedDashboards />} />
+        <Route path="feeds/dashboards/:group" element={<FeedDashboards />} />
         <Route path="admin/escalation" element={<Private roles={["admin"]}><EscalationMatrix /></Private>} />
         <Route path="approvals" element={<Private roles={["admin","risk_officer","approver"]}><ApprovalTasks /></Private>} />
         <Route path="reports" element={<Reports />} />

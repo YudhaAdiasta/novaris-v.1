@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-import os, uuid, logging, csv, io
+import os, uuid, logging, csv, io, re
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
@@ -876,6 +876,469 @@ async def dashboard_phase3(user=Depends(get_current_user)):
         "high_critical_accepted": sum(1 for a in active_acc if a.get("residual_risk_level") in ("High","Critical")),
     }
 
+# =========================================================================
+# PHASE 3 — DATA FEED EXTENSION
+# =========================================================================
+# Configuration-driven feed groups. All fields, scoring bands, rating maps,
+# and validation rules live in FEED_GROUPS so they can be tuned without
+# code changes. The mapping config collection (feed_mapping_config) is
+# reserved for a future Admin UI to remap incoming CSV columns -> RMS fields.
+# =========================================================================
+
+FEED_GROUPS: Dict[str, Dict[str, Any]] = {
+    "appetite": {
+        "label": "Risk Appetite Feed",
+        "fields": ["period","risk_type","appetite_level","tolerance_metric","tolerance_lower_limit","tolerance_upper_limit","warning_threshold","breach_threshold","limit_type","limit_value","unit_of_measure","effective_date","expiry_date","approval_reference","approved_by","notes"],
+        "required": ["period","risk_type","appetite_level","warning_threshold","breach_threshold"],
+        "numeric": ["tolerance_lower_limit","tolerance_upper_limit","warning_threshold","breach_threshold","limit_value"],
+        "store": "feed_appetite",
+    },
+    "quantitative": {
+        "label": "Risk Profile Quantitative Feed",
+        "fields": ["period","risk_type","parameter_code","parameter_name","actual_value","target_value","benchmark_value","tolerance_band_1","tolerance_band_2","tolerance_band_3","tolerance_band_4","tolerance_band_5","weight","data_source","notes"],
+        "required": ["period","risk_type","parameter_code","actual_value","weight"],
+        "numeric": ["actual_value","target_value","benchmark_value","tolerance_band_1","tolerance_band_2","tolerance_band_3","tolerance_band_4","tolerance_band_5","weight"],
+        "store": "feed_quantitative",
+    },
+    "holdings": {
+        "label": "Investment Holding Feed",
+        "fields": ["period","valuation_date","asset_class","instrument_code","instrument_name","issuer_name","counterparty_name","sector","industry","country","currency","quantity","book_value","market_value","acquisition_value","unrealized_gain_loss","realized_gain_loss","investment_income","percentage_to_total_investment","percentage_to_total_asset","rating","maturity_date","duration","modified_duration","yield_to_maturity","coupon_rate","portfolio_category","notes"],
+        "required": ["period","instrument_code","asset_class","market_value"],
+        "numeric": ["quantity","book_value","market_value","acquisition_value","unrealized_gain_loss","realized_gain_loss","investment_income","percentage_to_total_investment","percentage_to_total_asset","duration","modified_duration","yield_to_maturity","coupon_rate"],
+        "store": "feed_holdings",
+    },
+    "fixed_income": {
+        "label": "Fixed Income Detail Feed",
+        "fields": ["period","valuation_date","instrument_code","instrument_name","instrument_type","issuer_name","issuer_type","sector","rating","rating_agency","issue_date","maturity_date","tenor","remaining_tenor","coupon_rate","coupon_type","coupon_frequency","face_value","book_value","market_value","clean_price","dirty_price","yield_to_maturity","yield_change","duration","modified_duration","convexity","accrued_interest","unrealized_gain_loss","average_daily_trade","liquidity_percentage","days_traded","total_observation_days","notes"],
+        "required": ["period","instrument_code","instrument_type","market_value","maturity_date"],
+        "numeric": ["face_value","book_value","market_value","clean_price","dirty_price","yield_to_maturity","yield_change","duration","modified_duration","convexity","accrued_interest","unrealized_gain_loss","average_daily_trade","liquidity_percentage","days_traded","total_observation_days","coupon_rate","tenor","remaining_tenor"],
+        "store": "feed_fixed_income",
+    },
+    "roi": {
+        "label": "ROI / Rentability / Funding Feed",
+        "fields": ["period","report_date","roi_realized","roi_realized_unrealized","roi_business_plan","roi_monthly_target","roi_deviation","roa_actual","roa_business_plan","roa_deviation","investment_income","investment_expense","operating_expense","bopo_ratio","net_asset","available_asset","actuarial_liability","funding_asset","funding_ratio","solvability_ratio","cash_inflow","cash_outflow","net_cash_flow","notes"],
+        "required": ["period","roi_realized","roi_business_plan"],
+        "numeric": ["roi_realized","roi_realized_unrealized","roi_business_plan","roi_monthly_target","roi_deviation","roa_actual","roa_business_plan","roa_deviation","investment_income","investment_expense","operating_expense","bopo_ratio","net_asset","available_asset","actuarial_liability","funding_asset","funding_ratio","solvability_ratio","cash_inflow","cash_outflow","net_cash_flow"],
+        "store": "feed_roi",
+    },
+    "scoring": {
+        "label": "Instrument Risk Scoring Feed",
+        "fields": ["period","scoring_date","instrument_type","instrument_code","instrument_name","issuer_name","asset_class","parameter_code","parameter_name","parameter_value","parameter_score","parameter_weight","notes"],
+        "required": ["period","instrument_code","instrument_type","parameter_code","parameter_score","parameter_weight"],
+        "numeric": ["parameter_value","parameter_score","parameter_weight"],
+        "store": "feed_scoring",
+    },
+}
+
+ALLOWED_RISK_TYPES = ["Strategic Risk","Operational Risk","Credit Risk","Market Risk","Liquidity Risk","Legal Risk","Compliance Risk","Reputation Risk"]
+ALLOWED_APPETITE_LEVELS = ["Low","Low to Medium","Medium","Medium to High","High"]
+
+def _rating_from_score(s: float) -> str:
+    if s < 1.5: return "Low"
+    if s < 2.5: return "Low to Medium"
+    if s < 3.5: return "Medium"
+    if s < 4.5: return "Medium to High"
+    return "High"
+
+INSTRUMENT_CATEGORY = [(1.5, "Very Low"), (2.5, "Low"), (3.5, "Moderate"), (4.5, "High"), (999, "Very High")]
+def _category_from_score(s: float) -> str:
+    for thr, label in INSTRUMENT_CATEGORY:
+        if s < thr: return label
+    return "Very High"
+
+def _validate_row(group_key: str, row: Dict[str, Any], idx: int) -> List[Dict[str, Any]]:
+    """Return list of {row, field, message}. Empty list = valid."""
+    cfg = FEED_GROUPS[group_key]
+    errors: List[Dict[str, Any]] = []
+    for f in cfg["required"]:
+        v = row.get(f)
+        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
+            errors.append({"row": idx, "field": f, "message": f"'{f}' is required"})
+    for f in cfg.get("numeric", []):
+        v = row.get(f)
+        if v in (None, ""): continue
+        try: row[f] = float(v)
+        except (TypeError, ValueError):
+            errors.append({"row": idx, "field": f, "message": f"'{f}' must be numeric (got '{v}')"})
+    rt = row.get("risk_type")
+    if rt and rt not in ALLOWED_RISK_TYPES:
+        errors.append({"row": idx, "field": "risk_type", "message": f"Unknown risk_type '{rt}'. Allowed: {', '.join(ALLOWED_RISK_TYPES)}"})
+    al = row.get("appetite_level")
+    if al and al not in ALLOWED_APPETITE_LEVELS:
+        errors.append({"row": idx, "field": "appetite_level", "message": f"Unknown appetite_level '{al}'"})
+    p = row.get("period")
+    if p and not re.match(r"^\d{4}-(0[1-9]|1[0-2]|Q[1-4]|H[1-2]|FY)$", str(p)):
+        errors.append({"row": idx, "field": "period", "message": f"Bad period '{p}'. Use YYYY-MM, YYYY-Q1..Q4, YYYY-H1/H2, or YYYY-FY"})
+    return errors
+
+def _score_quantitative_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute calculated_score (1..5) from tolerance bands. Lower band = better → score 1."""
+    try:
+        actual = float(row.get("actual_value", 0))
+    except Exception:
+        actual = 0.0
+    bands = []
+    for i in range(1, 6):
+        v = row.get(f"tolerance_band_{i}")
+        if v not in (None, ""):
+            try: bands.append(float(v))
+            except Exception: pass
+    score = 3.0
+    if len(bands) >= 2:
+        bands_sorted = sorted(bands)
+        # actual <= bands_sorted[0] → score 1, etc.
+        score = float(len(bands_sorted))
+        for i, b in enumerate(bands_sorted):
+            if actual <= b:
+                score = float(i + 1)
+                break
+    weight = float(row.get("weight") or 1)
+    row["calculated_score"] = round(score, 2)
+    row["weighted_score"] = round(score * weight, 2)
+    return row
+
+def _score_instrument_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    s = float(row.get("parameter_score") or 0)
+    w = float(row.get("parameter_weight") or 0)
+    row["weighted_score"] = round(s * w / 100.0, 4) if w > 1 else round(s * w, 4)
+    return row
+
+# ---- Pydantic models ----
+class FeedBatchIn(BaseModel):
+    group: str
+    period: str
+    source_file_name: str = ""
+    records: List[Dict[str, Any]] = []
+    is_revision: bool = False
+    revision_of: Optional[str] = None
+    notes: str = ""
+
+class ApprovalAct(BaseModel):
+    notes: str = ""
+
+# ---- Endpoints ----
+@api.get("/feeds/groups")
+async def feeds_groups(user=Depends(get_current_user)):
+    return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "store"}} for k, v in FEED_GROUPS.items()]
+
+@api.get("/feeds/template/{group}.csv")
+async def feeds_template(group: str, user=Depends(get_current_user)):
+    if group not in FEED_GROUPS: raise HTTPException(404, "Unknown group")
+    cfg = FEED_GROUPS[group]
+    header = ",".join(cfg["fields"])
+    samples = {
+        "appetite": [["2026-Q1","Market Risk","Medium","Investment concentration","0","20","15","25","Concentration","20","%","2026-01-01","2026-12-31","BOD-2026-001","BOD",""]],
+        "quantitative": [["2026-Q1","Market Risk","MKT-001","Investment asset growth","12","10","11","5","10","15","20","25","20","Treasury report",""]],
+        "holdings": [["2026-Q1","2026-02-28","Equity","INV-001","BBCA","BCA","","Financial","Banking","ID","IDR","10000","85000000","95000000","85000000","10000000","0","2500000","8.5","15","AA","","","","","6.5","Strategic",""]],
+        "fixed_income": [["2026-Q1","2026-02-28","BOND-001","INDOGB FR0070","Government Bond","Republic of Indonesia","Sovereign","Government","BBB","S&P","2020-01-01","2030-01-01","10","4","7.25","Fixed","Semi-Annual","100000000","99500000","100200000","100.2","100.5","7.1","-0.05","3.8","3.7","18.2","250000","0","8500000000","85","17","20",""]],
+        "roi": [["2026-Q1","2026-02-28","8.2","8.5","8.0","8.1","0.2","6.5","6.3","0.2","850000000","120000000","450000000","52.9","12500000000","11800000000","9500000000","11200000000","1.18","2.10","450000000","380000000","70000000",""]],
+        "scoring": [["2026-Q1","2026-02-28","Government Bond","BOND-001","INDOGB FR0070","Republic of Indonesia","Fixed Income","liquidity_percentage","Liquidity %","85","2","25","",]],
+    }
+    rows = samples.get(group, [])
+    body = "\n".join([",".join(str(c) for c in r) for r in rows])
+    csv_data = header + ("\n" + body if body else "")
+    return StreamingResponse(iter([csv_data]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{group}_template.csv"'})
+
+@api.post("/feeds/batches")
+async def create_batch(body: FeedBatchIn, user=Depends(get_current_user)):
+    if body.group not in FEED_GROUPS: raise HTTPException(400, "Unknown feed group")
+    # validate every row
+    errors: List[Dict[str, Any]] = []
+    for i, r in enumerate(body.records):
+        errors.extend(_validate_row(body.group, r, i + 1))
+    # dedup guard: cannot create non-revision batch if already Processed for same group+period
+    if not body.is_revision:
+        existing = await db.data_feed_batches.find_one({"group": body.group, "period": body.period, "status": "Processed"})
+        if existing:
+            errors.append({"row": 0, "field": "period", "message": f"Period {body.period} already processed (batch {existing.get('batch_code')}). Submit as a revision batch instead."})
+    bn = await db.data_feed_batches.count_documents({}) + 1
+    status = "Validation Failed" if errors else "Ready for Review"
+    doc = {
+        "id": new_id(),
+        "batch_code": f"BATCH-{4000 + bn}",
+        "group": body.group,
+        "group_label": FEED_GROUPS[body.group]["label"],
+        "period": body.period,
+        "source_file_name": body.source_file_name,
+        "uploaded_by": user["id"],
+        "uploaded_by_name": user["name"],
+        "uploaded_at": now_iso(),
+        "total_records": len(body.records),
+        "successful_records": len(body.records) - len(errors),
+        "failed_records": len(errors),
+        "validation_errors": errors[:500],
+        "records": body.records,
+        "status": status,
+        "is_revision": body.is_revision,
+        "revision_of": body.revision_of,
+        "approval_history": [],
+        "required_approval_levels": 1,  # multi-level ready
+        "approved_levels": 0,
+        "processed_at": None,
+        "notes": body.notes,
+    }
+    await db.data_feed_batches.insert_one(doc)
+    await audit(user, "Feed Batch Uploaded", "FeedBatch", doc["id"], None, {"group": body.group, "period": body.period, "records": len(body.records), "errors": len(errors)})
+    doc.pop("_id", None)
+    return doc
+
+@api.get("/feeds/batches")
+async def list_batches(group: Optional[str] = None, period: Optional[str] = None, status: Optional[str] = None, user=Depends(get_current_user)):
+    q: Dict[str, Any] = {}
+    if group: q["group"] = group
+    if period: q["period"] = period
+    if status: q["status"] = status
+    rows = await db.data_feed_batches.find(q, {"_id": 0, "records": 0}).sort("uploaded_at", -1).to_list(500)
+    return rows
+
+@api.get("/feeds/batches/{bid}")
+async def get_batch(bid: str, user=Depends(get_current_user)):
+    b = await db.data_feed_batches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    return b
+
+@api.get("/feeds/batches/{bid}/errors.csv")
+async def export_batch_errors(bid: str, user=Depends(get_current_user)):
+    b = await db.data_feed_batches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    buf = io.StringIO(); w = csv.writer(buf)
+    w.writerow(["row","field","message"])
+    for e in b.get("validation_errors", []): w.writerow([e.get("row"), e.get("field"), e.get("message")])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{b.get("batch_code","batch")}_errors.csv"'})
+
+@api.post("/feeds/batches/{bid}/approve")
+async def approve_batch(bid: str, body: ApprovalAct, user=Depends(require_roles("admin","risk_officer"))):
+    b = await db.data_feed_batches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    if b["status"] not in ("Ready for Review",):
+        raise HTTPException(400, f"Batch in status '{b['status']}' cannot be approved")
+    if b.get("failed_records", 0) > 0:
+        raise HTTPException(400, "Batch has validation errors and cannot be approved")
+    hist = b.get("approval_history", []) + [{"action":"Approved","by":user["name"],"role":user["role"],"notes":body.notes,"at":now_iso()}]
+    approved_levels = b.get("approved_levels", 0) + 1
+    required = b.get("required_approval_levels", 1)
+    new_status = "Approved" if approved_levels >= required else "Ready for Review"
+    await db.data_feed_batches.update_one({"id": bid}, {"$set": {"status": new_status, "approval_history": hist, "approved_levels": approved_levels}})
+    await audit(user, "Feed Batch Approved", "FeedBatch", bid, None, {"status": new_status}, body.notes)
+    # Auto-process once all approvals collected
+    if new_status == "Approved":
+        await _process_batch(bid, user)
+    return {"ok": True, "status": new_status}
+
+@api.post("/feeds/batches/{bid}/reject")
+async def reject_batch(bid: str, body: ApprovalAct, user=Depends(require_roles("admin","risk_officer"))):
+    b = await db.data_feed_batches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    hist = b.get("approval_history", []) + [{"action":"Rejected","by":user["name"],"role":user["role"],"notes":body.notes,"at":now_iso()}]
+    await db.data_feed_batches.update_one({"id": bid}, {"$set": {"status": "Rejected", "approval_history": hist}})
+    await audit(user, "Feed Batch Rejected", "FeedBatch", bid, None, None, body.notes)
+    return {"ok": True}
+
+async def _process_batch(bid: str, user: Dict[str, Any]):
+    b = await db.data_feed_batches.find_one({"id": bid}, {"_id": 0})
+    if not b: return
+    cfg = FEED_GROUPS[b["group"]]
+    store = cfg["store"]
+    # Wipe previously-processed records for same (group, period) — versioned by batch_id
+    await db[store].delete_many({"_batch_period": b["period"]})
+    enriched: List[Dict[str, Any]] = []
+    for r in b.get("records", []):
+        rec = dict(r)
+        rec["_batch_id"] = bid; rec["_batch_period"] = b["period"]; rec["_processed_at"] = now_iso()
+        if b["group"] == "quantitative":
+            rec = _score_quantitative_row(rec)
+        elif b["group"] == "scoring":
+            rec = _score_instrument_row(rec)
+        enriched.append(rec)
+    if enriched: await db[store].insert_many(enriched)
+
+    # Aggregations / rating per risk_type for quantitative feed
+    if b["group"] == "quantitative":
+        by_rt: Dict[str, Dict[str, float]] = {}
+        for r in enriched:
+            rt = r.get("risk_type", "Other")
+            by_rt.setdefault(rt, {"ws": 0.0, "w": 0.0})
+            by_rt[rt]["ws"] += float(r.get("weighted_score") or 0)
+            by_rt[rt]["w"] += float(r.get("weight") or 0)
+        await db.calculated_risk_indicator.delete_many({"period": b["period"], "kind": "quantitative_rating"})
+        for rt, agg in by_rt.items():
+            avg = agg["ws"] / agg["w"] if agg["w"] else 0
+            await db.calculated_risk_indicator.insert_one({"id": new_id(), "kind": "quantitative_rating",
+                "period": b["period"], "risk_type": rt, "score": round(avg, 3),
+                "rating": _rating_from_score(avg), "computed_at": now_iso(), "batch_id": bid})
+        # Breach engine: compare each quantitative param against appetite warning/breach thresholds for same risk_type
+        appetites = await db.feed_appetite.find({"period": b["period"]}, {"_id": 0}).to_list(500)
+        appetite_map = {a.get("risk_type"): a for a in appetites}
+        for r in enriched:
+            ap = appetite_map.get(r.get("risk_type"))
+            if not ap: continue
+            actual = float(r.get("actual_value") or 0)
+            warn = float(ap.get("warning_threshold") or 0)
+            breach = float(ap.get("breach_threshold") or 0)
+            severity = None
+            if breach and actual >= breach: severity = "Breach"
+            elif warn and actual >= warn: severity = "Warning"
+            if severity:
+                br = {"id": new_id(), "feed_group": b["group"], "period": b["period"],
+                      "metric": r.get("parameter_code") or r.get("parameter_name"),
+                      "risk_type": r.get("risk_type"), "actual_value": actual,
+                      "warning_threshold": warn, "breach_threshold": breach,
+                      "severity": severity, "owner_id": user.get("id"),
+                      "status": "Open", "action_plan": "", "due_date": "",
+                      "escalation_level": 1 if severity == "Warning" else 2,
+                      "batch_id": bid, "created_at": now_iso()}
+                await db.feed_breaches.insert_one(br)
+                await _notify_role("risk_officer", f"{severity}: {br['metric']} for {br['risk_type']} = {actual}", "FeedBreach", br["id"])
+
+    # Instrument scoring aggregation per instrument_code
+    if b["group"] == "scoring":
+        by_inst: Dict[str, Dict[str, Any]] = {}
+        for r in enriched:
+            ic = r.get("instrument_code", "")
+            by_inst.setdefault(ic, {"ws": 0.0, "w": 0.0, "name": r.get("instrument_name"), "type": r.get("instrument_type"), "period": r.get("period")})
+            by_inst[ic]["ws"] += float(r.get("weighted_score") or 0)
+            by_inst[ic]["w"] += float(r.get("parameter_weight") or 0)
+        await db.calculated_risk_indicator.delete_many({"period": b["period"], "kind": "instrument_scoring"})
+        for ic, agg in by_inst.items():
+            total = agg["ws"] / (agg["w"] if agg["w"] and agg["w"] <= 1 else 1) if agg["w"] else 0
+            # If weights were given as percentages (sum to 100) we already divided in _score_instrument_row
+            if agg["w"] > 1:
+                total = agg["ws"]
+            cat = _category_from_score(total)
+            await db.calculated_risk_indicator.insert_one({"id": new_id(), "kind": "instrument_scoring",
+                "period": agg["period"], "instrument_code": ic, "instrument_name": agg["name"],
+                "instrument_type": agg["type"], "total_score": round(total, 3),
+                "risk_category": cat, "watchlist": cat in ("High","Very High"),
+                "computed_at": now_iso(), "batch_id": bid})
+
+    await db.data_feed_batches.update_one({"id": bid}, {"$set": {"status": "Processed", "processed_at": now_iso()}})
+    await db.feed_processing_log.insert_one({"id": new_id(), "batch_id": bid, "group": b["group"],
+        "period": b["period"], "records_processed": len(enriched), "at": now_iso(), "by": user.get("name")})
+    await audit(user, "Feed Batch Processed", "FeedBatch", bid, None, {"records": len(enriched)})
+
+# ---- Breach + action plan ----
+class BreachActionIn(BaseModel):
+    action_plan: str = ""
+    owner_id: str = ""
+    due_date: str = ""
+    status: str = "Open"
+
+@api.get("/feeds/breaches")
+async def list_breaches(severity: Optional[str] = None, status: Optional[str] = None, user=Depends(get_current_user)):
+    q: Dict[str, Any] = {}
+    if severity: q["severity"] = severity
+    if status: q["status"] = status
+    return await db.feed_breaches.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+@api.put("/feeds/breaches/{bid}")
+async def update_breach(bid: str, body: BreachActionIn, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    await db.feed_breaches.update_one({"id": bid}, {"$set": body.model_dump()})
+    await audit(user, "Feed Breach Updated", "FeedBreach", bid, None, {"status": body.status})
+    return await db.feed_breaches.find_one({"id": bid}, {"_id": 0})
+
+# ---- Feed dashboards ----
+@api.get("/feeds/dashboard")
+async def feed_dashboard(user=Depends(get_current_user)):
+    batches = await db.data_feed_batches.find({}, {"_id": 0, "records": 0}).to_list(2000)
+    by_group: Dict[str, Dict[str, int]] = {k: {"total": 0, "processed": 0, "pending": 0, "failed": 0} for k in FEED_GROUPS}
+    for b in batches:
+        g = b.get("group", "")
+        if g not in by_group: continue
+        by_group[g]["total"] += 1
+        s = b.get("status")
+        if s == "Processed": by_group[g]["processed"] += 1
+        elif s == "Ready for Review": by_group[g]["pending"] += 1
+        elif s in ("Validation Failed","Rejected"): by_group[g]["failed"] += 1
+    completeness = round(100 * sum(v["processed"] for v in by_group.values()) / max(1, sum(v["total"] for v in by_group.values())), 1)
+    breaches = await db.feed_breaches.find({"status": "Open"}, {"_id": 0}).to_list(500)
+    return {"by_group": by_group, "completeness": completeness,
+            "pending_approval": sum(1 for b in batches if b.get("status") == "Ready for Review"),
+            "failed": sum(1 for b in batches if b.get("status") in ("Validation Failed","Rejected")),
+            "processed": sum(1 for b in batches if b.get("status") == "Processed"),
+            "open_breaches": len(breaches),
+            "breaches_by_severity": {s: sum(1 for b in breaches if b.get("severity") == s) for s in ("Warning","Breach")}}
+
+@api.get("/feeds/dashboard/appetite")
+async def feed_appetite_dashboard(period: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"period": period} if period else {}
+    appetites = await db.feed_appetite.find(q, {"_id": 0}).to_list(500)
+    breaches = await db.feed_breaches.find(q, {"_id": 0}).to_list(500)
+    indicators = await db.calculated_risk_indicator.find({**q, "kind": "quantitative_rating"}, {"_id": 0}).to_list(500)
+    return {"appetites": appetites, "breaches": breaches, "ratings": indicators}
+
+@api.get("/feeds/dashboard/holdings")
+async def feed_holdings_dashboard(period: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"_batch_period": period} if period else {}
+    rows = await db.feed_holdings.find(q, {"_id": 0}).to_list(5000)
+    def agg(key):
+        out: Dict[str, float] = {}
+        for r in rows:
+            k = str(r.get(key) or "Unknown")
+            out[k] = out.get(k, 0.0) + float(r.get("market_value") or 0)
+        return [{"label": k, "value": round(v, 2)} for k, v in sorted(out.items(), key=lambda x: -x[1])]
+    top10 = sorted(rows, key=lambda r: float(r.get("market_value") or 0), reverse=True)[:10]
+    return {"by_asset_class": agg("asset_class"), "by_issuer": agg("issuer_name"),
+            "by_sector": agg("sector"), "by_rating": agg("rating"),
+            "unrealized_total": round(sum(float(r.get("unrealized_gain_loss") or 0) for r in rows), 2),
+            "top10": top10, "total_records": len(rows)}
+
+@api.get("/feeds/dashboard/fixed-income")
+async def feed_fi_dashboard(period: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"_batch_period": period} if period else {}
+    rows = await db.feed_fixed_income.find(q, {"_id": 0}).to_list(5000)
+    def bucket_maturity(r):
+        try: t = float(r.get("remaining_tenor") or 0)
+        except: t = 0
+        if t < 1: return "< 1y"
+        if t < 3: return "1–3y"
+        if t < 5: return "3–5y"
+        if t < 10: return "5–10y"
+        return "> 10y"
+    maturity: Dict[str, float] = {}
+    rating: Dict[str, float] = {}
+    duration_sum = 0.0; count = 0
+    for r in rows:
+        maturity[bucket_maturity(r)] = maturity.get(bucket_maturity(r), 0) + float(r.get("market_value") or 0)
+        rt = str(r.get("rating") or "NR"); rating[rt] = rating.get(rt, 0) + float(r.get("market_value") or 0)
+        try: duration_sum += float(r.get("duration") or 0); count += 1
+        except: pass
+    return {"maturity_ladder": [{"bucket": k, "value": round(v, 2)} for k, v in maturity.items()],
+            "rating_distribution": [{"rating": k, "value": round(v, 2)} for k, v in rating.items()],
+            "avg_duration": round(duration_sum / max(count, 1), 2), "total_records": len(rows)}
+
+@api.get("/feeds/dashboard/roi")
+async def feed_roi_dashboard(user=Depends(get_current_user)):
+    rows = await db.feed_roi.find({}, {"_id": 0}).sort("period", 1).to_list(500)
+    return {"series": rows, "latest": rows[-1] if rows else None}
+
+@api.get("/feeds/dashboard/scoring")
+async def feed_scoring_dashboard(period: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"kind": "instrument_scoring"}
+    if period: q["period"] = period
+    ind = await db.calculated_risk_indicator.find(q, {"_id": 0}).sort("total_score", -1).to_list(500)
+    by_cat: Dict[str, int] = {}
+    for i in ind: by_cat[i.get("risk_category","Unknown")] = by_cat.get(i.get("risk_category","Unknown"), 0) + 1
+    return {"instruments": ind, "by_category": [{"label": k, "value": v} for k, v in by_cat.items()],
+            "watchlist": [i for i in ind if i.get("watchlist")][:20]}
+
+# ---- CSV export per group ----
+@api.get("/feeds/export/{group}.csv")
+async def feed_export(group: str, period: Optional[str] = None, user=Depends(get_current_user)):
+    if group not in FEED_GROUPS: raise HTTPException(404, "Unknown group")
+    cfg = FEED_GROUPS[group]
+    q = {"_batch_period": period} if period else {}
+    rows = await db[cfg["store"]].find(q, {"_id": 0}).to_list(50000)
+    buf = io.StringIO(); w = csv.writer(buf)
+    w.writerow(cfg["fields"])
+    for r in rows: w.writerow([r.get(f, "") for f in cfg["fields"]])
+    await audit(user, "Report Exported", "Report", f"feed-{group}")
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="feed_{group}.csv"'})
+
 # --- Audit ---
 @api.get("/audit")
 async def list_audit(user=Depends(get_current_user)):
@@ -1086,6 +1549,10 @@ async def seed_all():
             doc = _enrich_risk(doc)
             await db.risks.insert_one(doc)
 
+    # Phase 3 — Data Feed seed: only seed if no batches exist yet
+    if await db.data_feed_batches.count_documents({}) == 0:
+        await _seed_data_feeds(cat_map)
+
     # Phase 2 seed
     if await db.escalations.count_documents({}) == 0:
         for lvl, role, days in [("Critical","approver",1),("High","risk_officer",3),("Medium","risk_owner",7),("Low","risk_owner",14)]:
@@ -1122,6 +1589,65 @@ async def seed_all():
                 "financial_loss": loss, "root_cause":"", "corrective_actions":"",
                 "reported_by": oid, "reported_by_name":"Owen Owner", "reported_at": now_iso(),
                 "created_at": now_iso(), "updated_at": now_iso()})
+
+async def _seed_data_feeds(cat_map):
+    """Seed one fully-processed batch per feed group so dashboards have data on first boot."""
+    admin = await db.users.find_one({"role": "admin"})
+    seeds = {
+        "appetite": [
+            {"period":"2026-Q1","risk_type":"Market Risk","appetite_level":"Medium","tolerance_metric":"Issuer concentration","warning_threshold":15,"breach_threshold":20,"limit_value":20,"unit_of_measure":"%","effective_date":"2026-01-01","expiry_date":"2026-12-31"},
+            {"period":"2026-Q1","risk_type":"Liquidity Risk","appetite_level":"Low","tolerance_metric":"Cash gap","warning_threshold":8,"breach_threshold":12,"unit_of_measure":"days","effective_date":"2026-01-01","expiry_date":"2026-12-31"},
+            {"period":"2026-Q1","risk_type":"Credit Risk","appetite_level":"Low to Medium","tolerance_metric":"Below-BBB exposure","warning_threshold":10,"breach_threshold":15,"unit_of_measure":"%","effective_date":"2026-01-01","expiry_date":"2026-12-31"},
+        ],
+        "quantitative": [
+            {"period":"2026-Q1","risk_type":"Market Risk","parameter_code":"MKT-CONC","parameter_name":"Issuer concentration","actual_value":22,"weight":40,"tolerance_band_1":5,"tolerance_band_2":10,"tolerance_band_3":15,"tolerance_band_4":20,"tolerance_band_5":25},
+            {"period":"2026-Q1","risk_type":"Market Risk","parameter_code":"MKT-GROWTH","parameter_name":"Asset growth","actual_value":12,"weight":60,"tolerance_band_1":5,"tolerance_band_2":10,"tolerance_band_3":15,"tolerance_band_4":20,"tolerance_band_5":25},
+            {"period":"2026-Q1","risk_type":"Liquidity Risk","parameter_code":"LIQ-MIN","parameter_name":"Min liquidity ratio","actual_value":7,"weight":50,"tolerance_band_1":3,"tolerance_band_2":5,"tolerance_band_3":7,"tolerance_band_4":10,"tolerance_band_5":15},
+        ],
+        "holdings": [
+            {"period":"2026-Q1","valuation_date":"2026-02-28","asset_class":"Government Bond","instrument_code":"INDOGB-FR70","instrument_name":"INDOGB FR0070","issuer_name":"Republic of Indonesia","sector":"Government","rating":"BBB","currency":"IDR","market_value":2500000000,"book_value":2480000000,"unrealized_gain_loss":20000000,"investment_income":85000000,"duration":3.8,"yield_to_maturity":7.1,"maturity_date":"2030-01-01"},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","asset_class":"Equity","instrument_code":"BBCA","instrument_name":"Bank Central Asia","issuer_name":"BCA","sector":"Financial","rating":"AA","currency":"IDR","market_value":1200000000,"book_value":1100000000,"unrealized_gain_loss":100000000,"investment_income":25000000},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","asset_class":"Corporate Bond","instrument_code":"PLN-2030","instrument_name":"PLN 2030","issuer_name":"PT PLN","sector":"Utilities","rating":"A","currency":"IDR","market_value":800000000,"book_value":810000000,"unrealized_gain_loss":-10000000,"duration":4.2,"yield_to_maturity":8.5,"maturity_date":"2030-06-01"},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","asset_class":"Money Market","instrument_code":"BI-SUKBI-3M","instrument_name":"BI SukBI 3M","issuer_name":"Bank Indonesia","sector":"Government","rating":"BBB","currency":"IDR","market_value":500000000,"book_value":500000000,"unrealized_gain_loss":0,"duration":0.25},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","asset_class":"Equity","instrument_code":"TLKM","instrument_name":"Telkom Indonesia","issuer_name":"Telkom","sector":"Telecom","rating":"AA","currency":"IDR","market_value":600000000,"book_value":620000000,"unrealized_gain_loss":-20000000},
+        ],
+        "fixed_income": [
+            {"period":"2026-Q1","valuation_date":"2026-02-28","instrument_code":"INDOGB-FR70","instrument_name":"INDOGB FR0070","instrument_type":"Government Bond","issuer_name":"Republic of Indonesia","sector":"Government","rating":"BBB","rating_agency":"S&P","maturity_date":"2030-01-01","tenor":10,"remaining_tenor":4,"coupon_rate":7.25,"market_value":2500000000,"book_value":2480000000,"yield_to_maturity":7.1,"duration":3.8,"modified_duration":3.7,"convexity":18.2,"liquidity_percentage":85,"days_traded":17,"total_observation_days":20},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","instrument_code":"PLN-2030","instrument_name":"PLN 2030","instrument_type":"Corporate Bond","issuer_name":"PT PLN","sector":"Utilities","rating":"A","maturity_date":"2030-06-01","tenor":7,"remaining_tenor":4.3,"coupon_rate":8.0,"market_value":800000000,"yield_to_maturity":8.5,"duration":4.2,"modified_duration":4.0,"liquidity_percentage":62,"days_traded":12,"total_observation_days":20},
+            {"period":"2026-Q1","valuation_date":"2026-02-28","instrument_code":"BMRI-2028","instrument_name":"Bank Mandiri 2028","instrument_type":"Corporate Bond","issuer_name":"Bank Mandiri","sector":"Banking","rating":"AA","maturity_date":"2028-09-01","tenor":5,"remaining_tenor":2.5,"coupon_rate":7.75,"market_value":1100000000,"yield_to_maturity":7.6,"duration":2.3,"modified_duration":2.2,"liquidity_percentage":75,"days_traded":15,"total_observation_days":20},
+        ],
+        "roi": [
+            {"period":"2025-Q4","report_date":"2025-12-31","roi_realized":7.8,"roi_business_plan":8.0,"roi_deviation":-0.2,"roa_actual":6.0,"roa_business_plan":6.2,"roa_deviation":-0.2,"bopo_ratio":54,"funding_ratio":1.15,"solvability_ratio":2.05,"cash_inflow":420000000,"cash_outflow":390000000,"net_cash_flow":30000000},
+            {"period":"2026-Q1","report_date":"2026-02-28","roi_realized":8.2,"roi_business_plan":8.0,"roi_deviation":0.2,"roa_actual":6.5,"roa_business_plan":6.3,"roa_deviation":0.2,"bopo_ratio":52.9,"funding_ratio":1.18,"solvability_ratio":2.10,"cash_inflow":450000000,"cash_outflow":380000000,"net_cash_flow":70000000,"actuarial_liability":9500000000,"funding_asset":11200000000,"available_asset":11800000000},
+        ],
+        "scoring": [
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Government Bond","instrument_code":"INDOGB-FR70","instrument_name":"INDOGB FR0070","issuer_name":"Republic of Indonesia","asset_class":"Fixed Income","parameter_code":"liquidity_percentage","parameter_name":"Liquidity %","parameter_value":85,"parameter_score":2,"parameter_weight":25},
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Government Bond","instrument_code":"INDOGB-FR70","instrument_name":"INDOGB FR0070","issuer_name":"Republic of Indonesia","asset_class":"Fixed Income","parameter_code":"interest_rate_risk","parameter_name":"IR Risk","parameter_value":3.7,"parameter_score":3,"parameter_weight":40},
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Government Bond","instrument_code":"INDOGB-FR70","instrument_name":"INDOGB FR0070","issuer_name":"Republic of Indonesia","asset_class":"Fixed Income","parameter_code":"reinvestment_risk","parameter_name":"Reinvestment","parameter_value":2,"parameter_score":2,"parameter_weight":35},
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Corporate Bond","instrument_code":"PLN-2030","instrument_name":"PLN 2030","issuer_name":"PT PLN","asset_class":"Fixed Income","parameter_code":"rating_score","parameter_name":"Rating","parameter_value":4,"parameter_score":4,"parameter_weight":30},
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Corporate Bond","instrument_code":"PLN-2030","instrument_name":"PLN 2030","issuer_name":"PT PLN","asset_class":"Fixed Income","parameter_code":"liquidity_percentage","parameter_name":"Liquidity %","parameter_value":62,"parameter_score":4,"parameter_weight":25},
+            {"period":"2026-Q1","scoring_date":"2026-02-28","instrument_type":"Corporate Bond","instrument_code":"PLN-2030","instrument_name":"PLN 2030","issuer_name":"PT PLN","asset_class":"Fixed Income","parameter_code":"z_score","parameter_name":"Z-score","parameter_value":2.1,"parameter_score":4,"parameter_weight":45},
+        ],
+    }
+    # IMPORTANT: order matters — appetite must be processed before quantitative so breach engine has thresholds
+    order = ["appetite","quantitative","holdings","fixed_income","roi","scoring"]
+    for i, key in enumerate(order):
+        records = seeds[key]
+        bn = i + 1
+        doc = {
+            "id": new_id(), "batch_code": f"BATCH-{4000 + bn}", "group": key,
+            "group_label": FEED_GROUPS[key]["label"], "period": "2026-Q1",
+            "source_file_name": f"{key}_2026Q1.csv",
+            "uploaded_by": admin["id"] if admin else "", "uploaded_by_name": admin["name"] if admin else "System",
+            "uploaded_at": now_iso(), "total_records": len(records),
+            "successful_records": len(records), "failed_records": 0,
+            "validation_errors": [], "records": records,
+            "status": "Approved", "is_revision": False, "revision_of": None,
+            "approval_history": [{"action":"Approved","by":"System","role":"admin","notes":"Initial seed","at":now_iso()}],
+            "required_approval_levels": 1, "approved_levels": 1, "processed_at": None, "notes": "Seeded sample batch",
+        }
+        await db.data_feed_batches.insert_one(doc)
+        await _process_batch(doc["id"], {"id": admin["id"] if admin else "", "name": admin["name"] if admin else "System", "role": "admin"})
 
 # --- Lifecycle ---
 @app.on_event("startup")
