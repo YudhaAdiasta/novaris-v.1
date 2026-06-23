@@ -73,7 +73,7 @@ export default function Dashboard() {
                 <YAxis tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="value" radius={[4,4,0,0]}>
-                  {levelData.map((d, i) => <Cell key={i} fill={RISK_LEVEL_SOLID[d.name]} />)}
+                  {levelData.map((d) => <Cell key={d.name} fill={RISK_LEVEL_SOLID[d.name]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -88,7 +88,7 @@ export default function Dashboard() {
                 <Pie data={catData} dataKey="value" nameKey="name" cx="50%" cy="42%" outerRadius="70%" paddingAngle={2}
                   label={({ value }) => value > 0 ? value : ""}
                   labelLine={{ stroke: "#CBD5E1", strokeWidth: 1 }}>
-                  {catData.map((_, i) => <Cell key={i} fill={["#0D9488","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} stroke="#fff" strokeWidth={1.5} />)}
+                  {catData.map((d, i) => <Cell key={d.name} fill={["#0D9488","#10B981","#F59E0B","#F97316","#E11D48","#8B5CF6","#0EA5E9","#64748B"][i % 8]} stroke="#fff" strokeWidth={1.5} />)}
                 </Pie>
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E8F0" }} />
                 <Legend verticalAlign="bottom" height={48} iconType="circle" iconSize={8}
