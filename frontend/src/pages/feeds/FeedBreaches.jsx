@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { StatusBadge, RiskBadge } from "@/lib/badges";
 import DataTable, { RowActions, IconAction } from "@/components/DataTable";
-import { Pencil } from "lucide-react";
+import { Pencil, FileWarning, AlertOctagon } from "lucide-react";
 import { toast } from "sonner";
 
 export default function FeedBreaches() {
@@ -22,6 +22,15 @@ export default function FeedBreaches() {
   const save = async () => {
     try { await api.put(`/feeds/breaches/${editing.id}`, editing); toast.success("Saved"); setOpen(false); load(); }
     catch { toast.error("Failed"); }
+  };
+
+  const linkTreatment = async (b) => {
+    try { const { data } = await api.post(`/feeds/breaches/${b.id}/link-treatment`); toast.success(`Treatment plan created (${data.treatment_id.slice(0,8)}…)`); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const linkIncident = async (b) => {
+    try { const { data } = await api.post(`/feeds/breaches/${b.id}/link-incident`); toast.success(`Incident ${data.incident_code} reported`); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
   };
 
   const sevPill = (s) => s === "Breach"
@@ -39,14 +48,27 @@ export default function FeedBreaches() {
     { key: "escalation_level", header: "Esc. Lvl", align: "center", render: (b) => <span className="font-mono">{b.escalation_level || 1}</span> },
     { key: "status", header: "Status", render: (b) => <StatusBadge status={b.status} /> },
     { key: "due_date", header: "Due", render: (b) => <span className="text-xs">{b.due_date || "—"}</span> },
+    { key: "links", header: "Links", render: (b) => (
+      <div className="flex gap-1.5 text-xs">
+        {b.treatment_id && <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">TP</span>}
+        {b.incident_id && <span className="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">INC</span>}
+        {!b.treatment_id && !b.incident_id && <span className="text-slate-300">—</span>}
+      </div>
+    )},
   ];
 
   return (
     <div className="space-y-6">
       <div><h1 className="font-heading text-2xl font-bold tracking-tight text-slate-900">Feed Breaches &amp; Warnings</h1>
-        <p className="text-sm text-slate-500 mt-1">{list.length} alert(s) — auto-generated when feed data crosses appetite warning or breach thresholds.</p></div>
+        <p className="text-sm text-slate-500 mt-1">{list.length} alert(s) — auto-generated when feed data crosses appetite warning or breach thresholds. Auto-escalation runs hourly.</p></div>
       <DataTable columns={columns} rows={list} searchKeys={["metric","risk_type","severity","status"]} rowKey={(b)=>b.id} emptyText="No breaches yet."
-        actions={(b) => (<RowActions><IconAction icon={Pencil} label="Update" tone="primary" onClick={() => { setEditing(b); setOpen(true); }} /></RowActions>)}
+        actions={(b) => (
+          <RowActions>
+            <IconAction icon={Pencil} label="Update" tone="primary" onClick={() => { setEditing(b); setOpen(true); }} />
+            {!b.treatment_id && <IconAction icon={FileWarning} label="Create Treatment" onClick={() => linkTreatment(b)} />}
+            {!b.incident_id && <IconAction icon={AlertOctagon} label="Report Incident" tone="danger" onClick={() => linkIncident(b)} />}
+          </RowActions>
+        )}
       />
       <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Update Breach Action</DialogTitle></DialogHeader>
         {editing && <div className="space-y-3">

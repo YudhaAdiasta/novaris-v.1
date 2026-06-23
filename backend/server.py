@@ -3,7 +3,10 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-import os, uuid, logging, csv, io, re
+import os, uuid, logging, csv, io, re, asyncio
+from openpyxl import Workbook
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.styles import Font, PatternFill, Alignment
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
@@ -1003,6 +1006,15 @@ def _score_instrument_row(row: Dict[str, Any]) -> Dict[str, Any]:
     row["weighted_score"] = round(s * w / 100.0, 4) if w > 1 else round(s * w, 4)
     return row
 
+_TEMPLATE_SAMPLES: Dict[str, List[List[Any]]] = {
+    "appetite": [["2026-Q1","Market Risk","Medium","Investment concentration",0,20,15,25,"Concentration",20,"%","2026-01-01","2026-12-31","BOD-2026-001","BOD",""]],
+    "quantitative": [["2026-Q1","Market Risk","MKT-001","Investment asset growth",12,10,11,5,10,15,20,25,20,"Treasury report",""]],
+    "holdings": [["2026-Q1","2026-02-28","Equity","INV-001","BBCA","BCA","","Financial","Banking","ID","IDR",10000,85000000,95000000,85000000,10000000,0,2500000,8.5,15,"AA","","","","","",6.5,"Strategic",""]],
+    "fixed_income": [["2026-Q1","2026-02-28","BOND-001","INDOGB FR0070","Government Bond","Republic of Indonesia","Sovereign","Government","BBB","S&P","2020-01-01","2030-01-01",10,4,7.25,"Fixed","Semi-Annual",100000000,99500000,100200000,100.2,100.5,7.1,-0.05,3.8,3.7,18.2,250000,0,8500000000,85,17,20,""]],
+    "roi": [["2026-Q1","2026-02-28",8.2,8.5,8.0,8.1,0.2,6.5,6.3,0.2,850000000,120000000,450000000,52.9,12500000000,11800000000,9500000000,11200000000,1.18,2.10,450000000,380000000,70000000,""]],
+    "scoring": [["2026-Q1","2026-02-28","Government Bond","BOND-001","INDOGB FR0070","Republic of Indonesia","Fixed Income","liquidity_percentage","Liquidity %",85,2,25,""]],
+}
+
 # ---- Pydantic models ----
 class FeedBatchIn(BaseModel):
     group: str
@@ -1011,6 +1023,12 @@ class FeedBatchIn(BaseModel):
     records: List[Dict[str, Any]] = []
     is_revision: bool = False
     revision_of: Optional[str] = None
+    notes: str = ""
+    required_approval_levels: int = 1
+
+class FeedMappingIn(BaseModel):
+    group: str
+    mapping: Dict[str, str] = {}  # source_column -> rms_field
     notes: str = ""
 
 class ApprovalAct(BaseModel):
@@ -1022,38 +1040,111 @@ async def feeds_groups(user=Depends(get_current_user)):
     return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "store"}} for k, v in FEED_GROUPS.items()]
 
 @api.get("/feeds/template/{group}.csv")
-async def feeds_template(group: str, user=Depends(get_current_user)):
+async def feeds_template_csv(group: str, user=Depends(get_current_user)):
+    """Legacy CSV template (header + 1 sample row)."""
     if group not in FEED_GROUPS: raise HTTPException(404, "Unknown group")
     cfg = FEED_GROUPS[group]
-    header = ",".join(cfg["fields"])
-    samples = {
-        "appetite": [["2026-Q1","Market Risk","Medium","Investment concentration","0","20","15","25","Concentration","20","%","2026-01-01","2026-12-31","BOD-2026-001","BOD",""]],
-        "quantitative": [["2026-Q1","Market Risk","MKT-001","Investment asset growth","12","10","11","5","10","15","20","25","20","Treasury report",""]],
-        "holdings": [["2026-Q1","2026-02-28","Equity","INV-001","BBCA","BCA","","Financial","Banking","ID","IDR","10000","85000000","95000000","85000000","10000000","0","2500000","8.5","15","AA","","","","","6.5","Strategic",""]],
-        "fixed_income": [["2026-Q1","2026-02-28","BOND-001","INDOGB FR0070","Government Bond","Republic of Indonesia","Sovereign","Government","BBB","S&P","2020-01-01","2030-01-01","10","4","7.25","Fixed","Semi-Annual","100000000","99500000","100200000","100.2","100.5","7.1","-0.05","3.8","3.7","18.2","250000","0","8500000000","85","17","20",""]],
-        "roi": [["2026-Q1","2026-02-28","8.2","8.5","8.0","8.1","0.2","6.5","6.3","0.2","850000000","120000000","450000000","52.9","12500000000","11800000000","9500000000","11200000000","1.18","2.10","450000000","380000000","70000000",""]],
-        "scoring": [["2026-Q1","2026-02-28","Government Bond","BOND-001","INDOGB FR0070","Republic of Indonesia","Fixed Income","liquidity_percentage","Liquidity %","85","2","25","",]],
-    }
-    rows = samples.get(group, [])
-    body = "\n".join([",".join(str(c) for c in r) for r in rows])
-    csv_data = header + ("\n" + body if body else "")
+    samples = _TEMPLATE_SAMPLES.get(group, [])
+    body = "\n".join([",".join(str(c) for c in r) for r in samples])
+    csv_data = ",".join(cfg["fields"]) + ("\n" + body if body else "")
     return StreamingResponse(iter([csv_data]), media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{group}_template.csv"'})
+
+@api.get("/feeds/template/{group}.xlsx")
+async def feeds_template_xlsx(group: str, user=Depends(get_current_user)):
+    """xlsx template with formatting, sample row and drop-down validations."""
+    if group not in FEED_GROUPS: raise HTTPException(404, "Unknown group")
+    cfg = FEED_GROUPS[group]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = group[:31]
+    # Header
+    bold = Font(bold=True, color="FFFFFF")
+    fill = PatternFill("solid", fgColor="0D9488")
+    for i, f in enumerate(cfg["fields"], start=1):
+        c = ws.cell(row=1, column=i, value=f)
+        c.font = bold; c.fill = fill; c.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[c.column_letter].width = max(14, min(28, len(f) + 4))
+    # Sample row
+    for row_idx, sample in enumerate(_TEMPLATE_SAMPLES.get(group, []), start=2):
+        for i, v in enumerate(sample, start=1):
+            ws.cell(row=row_idx, column=i, value=v)
+    # Drop-down validations
+    validations = {
+        "risk_type": ALLOWED_RISK_TYPES,
+        "appetite_level": ALLOWED_APPETITE_LEVELS,
+        "asset_class": ["Government Bond","Corporate Bond","Equity","Money Market","Mutual Fund","Time Deposit","Property","Other"],
+        "instrument_type": ["Government Bond","Corporate Bond","Money Market","Mutual Fund","Time Deposit"],
+        "currency": ["IDR","USD","EUR","SGD","JPY"],
+        "rating": ["AAA","AA","A","BBB","BB","B","CCC","NR"],
+        "coupon_type": ["Fixed","Floating","Zero","Step-Up"],
+        "coupon_frequency": ["Monthly","Quarterly","Semi-Annual","Annual"],
+        "frequency": ["Daily","Weekly","Monthly","Quarterly","Semi-Annually","Annually","Ad Hoc"],
+    }
+    for f, options in validations.items():
+        if f not in cfg["fields"]: continue
+        col_idx = cfg["fields"].index(f) + 1
+        col_letter = ws.cell(row=1, column=col_idx).column_letter
+        dv = DataValidation(type="list", formula1=f'"{",".join(options)}"', allow_blank=True)
+        dv.error = f"Allowed: {', '.join(options[:5])}{'…' if len(options) > 5 else ''}"
+        dv.errorTitle = "Invalid value"
+        dv.add(f"{col_letter}2:{col_letter}1000")
+        ws.add_data_validation(dv)
+    # Freeze header
+    ws.freeze_panes = "A2"
+    # Notes sheet
+    notes = wb.create_sheet("README")
+    notes["A1"] = f"{cfg['label']} — Template"
+    notes["A1"].font = Font(bold=True, size=14)
+    notes["A3"] = "Required fields:"; notes["A3"].font = Font(bold=True)
+    for i, r in enumerate(cfg["required"], start=4): notes.cell(row=i, column=1, value=r)
+    notes.column_dimensions["A"].width = 40
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{group}_template.xlsx"'})
+
+# ---- Feed mapping config (admin column remap UI) ----
+@api.get("/feeds/mappings")
+async def list_mappings(user=Depends(get_current_user)):
+    return await db.feed_mapping_config.find({}, {"_id": 0}).to_list(50)
+
+@api.put("/feeds/mappings/{group}")
+async def upsert_mapping(group: str, body: FeedMappingIn, user=Depends(require_roles("admin"))):
+    if group not in FEED_GROUPS: raise HTTPException(404, "Unknown group")
+    doc = {"id": new_id(), "group": group, "mapping": body.mapping, "notes": body.notes, "updated_at": now_iso(), "updated_by": user["name"]}
+    await db.feed_mapping_config.update_one({"group": group}, {"$set": doc}, upsert=True)
+    await audit(user, "Configuration Changed", "FeedMapping", group, None, {"keys": list(body.mapping.keys())})
+    return doc
+
+@api.delete("/feeds/mappings/{group}")
+async def delete_mapping(group: str, user=Depends(require_roles("admin"))):
+    await db.feed_mapping_config.delete_one({"group": group})
+    await audit(user, "Configuration Changed", "FeedMapping", group, None, {"deleted": True})
+    return {"ok": True}
 
 @api.post("/feeds/batches")
 async def create_batch(body: FeedBatchIn, user=Depends(get_current_user)):
     if body.group not in FEED_GROUPS: raise HTTPException(400, "Unknown feed group")
+    # Apply column mapping if configured for this group
+    mapping_doc = await db.feed_mapping_config.find_one({"group": body.group}, {"_id": 0})
+    mapping = mapping_doc.get("mapping", {}) if mapping_doc else {}
+    if mapping:
+        body.records = [
+            {(mapping.get(k, k)): v for k, v in r.items()}
+            for r in body.records
+        ]
     # validate every row
     errors: List[Dict[str, Any]] = []
     for i, r in enumerate(body.records):
         errors.extend(_validate_row(body.group, r, i + 1))
-    # dedup guard: cannot create non-revision batch if already Processed for same group+period
+    # dedup guard
     if not body.is_revision:
         existing = await db.data_feed_batches.find_one({"group": body.group, "period": body.period, "status": "Processed"})
         if existing:
             errors.append({"row": 0, "field": "period", "message": f"Period {body.period} already processed (batch {existing.get('batch_code')}). Submit as a revision batch instead."})
     bn = await db.data_feed_batches.count_documents({}) + 1
     status = "Validation Failed" if errors else "Ready for Review"
+    levels = max(1, min(3, int(body.required_approval_levels or 1)))
     doc = {
         "id": new_id(),
         "batch_code": f"BATCH-{4000 + bn}",
@@ -1073,13 +1164,13 @@ async def create_batch(body: FeedBatchIn, user=Depends(get_current_user)):
         "is_revision": body.is_revision,
         "revision_of": body.revision_of,
         "approval_history": [],
-        "required_approval_levels": 1,  # multi-level ready
+        "required_approval_levels": levels,
         "approved_levels": 0,
         "processed_at": None,
         "notes": body.notes,
     }
     await db.data_feed_batches.insert_one(doc)
-    await audit(user, "Feed Batch Uploaded", "FeedBatch", doc["id"], None, {"group": body.group, "period": body.period, "records": len(body.records), "errors": len(errors)})
+    await audit(user, "Feed Batch Uploaded", "FeedBatch", doc["id"], None, {"group": body.group, "period": body.period, "records": len(body.records), "errors": len(errors), "levels": levels})
     doc.pop("_id", None)
     return doc
 
@@ -1238,6 +1329,74 @@ async def update_breach(bid: str, body: BreachActionIn, user=Depends(require_rol
     await db.feed_breaches.update_one({"id": bid}, {"$set": body.model_dump()})
     await audit(user, "Feed Breach Updated", "FeedBreach", bid, None, {"status": body.status})
     return await db.feed_breaches.find_one({"id": bid}, {"_id": 0})
+
+@api.post("/feeds/breaches/{bid}/link-treatment")
+async def link_breach_to_treatment(bid: str, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    """Create a Treatment Plan from a breach so breach mitigation flows into the existing workflow."""
+    b = await db.feed_breaches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    if b.get("treatment_id"): raise HTTPException(400, f"Already linked to treatment {b['treatment_id']}")
+    # Try to attach to an existing risk of the same risk_type; create a placeholder risk otherwise
+    risk = await db.risks.find_one({"category_id": {"$exists": True}}, {"_id": 0, "id": 1})
+    risk_id = risk["id"] if risk else ""
+    t_doc = {
+        "id": new_id(), "risk_id": risk_id,
+        "treatment_option": "Reduce / Mitigate",
+        "action_description": f"Mitigate {b['severity']} on {b.get('metric','')} ({b.get('risk_type','')}). Actual {b.get('actual_value')} vs breach {b.get('breach_threshold')}.",
+        "action_owner": user.get("name",""), "priority": "High" if b.get("severity") == "Breach" else "Medium",
+        "target_completion_date": b.get("due_date") or "", "target_residual_risk_level": "Low",
+        "progress_percentage": 0, "status": "Draft", "evidence_notes": "", "completion_remarks": "",
+        "linked_breach_id": bid, "linked_feed_group": b.get("feed_group"), "linked_period": b.get("period"),
+        "created_by": user["id"], "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.treatment_plans.insert_one(t_doc)
+    await db.feed_breaches.update_one({"id": bid}, {"$set": {"treatment_id": t_doc["id"], "status": "In Progress"}})
+    await audit(user, "Feed Breach Linked to Treatment", "FeedBreach", bid, None, {"treatment_id": t_doc["id"]})
+    t_doc.pop("_id", None); return {"ok": True, "treatment_id": t_doc["id"]}
+
+@api.post("/feeds/breaches/{bid}/link-incident")
+async def link_breach_to_incident(bid: str, user=Depends(require_roles("admin","risk_officer","risk_owner"))):
+    """Create an Incident record from a breach (use when the breach already caused a loss)."""
+    b = await db.feed_breaches.find_one({"id": bid}, {"_id": 0})
+    if not b: raise HTTPException(404, "Not found")
+    if b.get("incident_id"): raise HTTPException(400, f"Already linked to incident {b['incident_id']}")
+    n = await db.incidents.count_documents({})
+    i_doc = {
+        "id": new_id(), "incident_code": f"INC-{2000+n+1}",
+        "title": f"{b['severity']} breach: {b.get('metric','')}",
+        "description": f"Auto-created from feed breach {bid}. Actual {b.get('actual_value')} exceeded threshold {b.get('breach_threshold')} for {b.get('risk_type','')} in period {b.get('period','')}.",
+        "business_unit": "Risk Management", "occurrence_date": datetime.now(timezone.utc).date().isoformat(),
+        "severity": "High" if b.get("severity") == "Breach" else "Medium",
+        "status": "Reported", "financial_loss": 0, "root_cause": "",
+        "corrective_actions": "", "linked_breach_id": bid,
+        "reported_by": user["id"], "reported_by_name": user["name"], "reported_at": now_iso(),
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.incidents.insert_one(i_doc)
+    await db.feed_breaches.update_one({"id": bid}, {"$set": {"incident_id": i_doc["id"]}})
+    await audit(user, "Feed Breach Linked to Incident", "FeedBreach", bid, None, {"incident_id": i_doc["id"]})
+    i_doc.pop("_id", None); return {"ok": True, "incident_id": i_doc["id"], "incident_code": i_doc["incident_code"]}
+
+# ---- Background task: auto-escalate breaches whose due_date passed ----
+async def _breach_escalator_loop():
+    """Every hour, raise escalation_level + 1 for Open/In-Progress breaches past due_date, notify higher role."""
+    while True:
+        try:
+            today_s = datetime.now(timezone.utc).date().isoformat()
+            cursor = db.feed_breaches.find({"status": {"$in": ["Open","In Progress"]}, "due_date": {"$ne": "", "$lt": today_s}}, {"_id": 0})
+            async for b in cursor:
+                # Match against existing Escalation Matrix
+                rules = await db.escalations.find({}, {"_id": 0}).to_list(50)
+                # Map severity to risk_level for the existing matrix lookup
+                level = "Critical" if b.get("severity") == "Breach" else "High"
+                rule = next((r for r in rules if r.get("risk_level") == level), None)
+                next_lvl = (b.get("escalation_level") or 1) + 1
+                await db.feed_breaches.update_one({"id": b["id"]}, {"$set": {"escalation_level": next_lvl, "last_escalated_at": now_iso()}})
+                target_role = rule.get("notify_role") if rule else ("approver" if next_lvl >= 3 else "risk_officer")
+                await _notify_role(target_role, f"Breach overdue: {b.get('metric')} ({b.get('severity')}) escalated to L{next_lvl}", "FeedBreach", b["id"])
+        except Exception as e:
+            logging.warning(f"breach escalator: {e}")
+        await asyncio.sleep(3600)  # 1 hour
 
 # ---- Feed dashboards ----
 @api.get("/feeds/dashboard")
@@ -1653,6 +1812,8 @@ async def _seed_data_feeds(cat_map):
 @app.on_event("startup")
 async def on_startup():
     await seed_all()
+    # Start background breach escalator
+    asyncio.create_task(_breach_escalator_loop())
 
 @app.on_event("shutdown")
 async def on_shutdown():

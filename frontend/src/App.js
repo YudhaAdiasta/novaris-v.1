@@ -28,6 +28,7 @@ import Incidents from "@/pages/Incidents";
 import ReviewCalendar from "@/pages/ReviewCalendar";
 import Notifications from "@/pages/Notifications";
 import EscalationMatrix from "@/pages/admin/EscalationMatrix";
+import FeedMapping from "@/pages/admin/FeedMapping";
 import RiskTaxonomy from "@/pages/admin/RiskTaxonomy";
 import ScoringMatrix from "@/pages/admin/ScoringMatrix";
 import RiskAppetite from "@/pages/admin/RiskAppetite";
@@ -68,6 +69,7 @@ function AppRoutes() {
         <Route path="feeds/dashboards" element={<FeedDashboards />} />
         <Route path="feeds/dashboards/:group" element={<FeedDashboards />} />
         <Route path="admin/escalation" element={<Private roles={["admin"]}><EscalationMatrix /></Private>} />
+        <Route path="admin/feed-mapping" element={<Private roles={["admin"]}><FeedMapping /></Private>} />
         <Route path="approvals" element={<Private roles={["admin","risk_officer","approver"]}><ApprovalTasks /></Private>} />
         <Route path="reports" element={<Reports />} />
         <Route path="audit" element={<AuditTrail />} />

@@ -43,6 +43,7 @@ export default function FeedUploadWizard() {
   const [headers, setHeaders] = useState([]);
   const [records, setRecords] = useState([]);
   const [isRevision, setIsRevision] = useState(false);
+  const [requireSecondLevel, setRequireSecondLevel] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { api.get("/feeds/groups").then((r) => setGroups(r.data)); }, []);
@@ -68,7 +69,7 @@ export default function FeedUploadWizard() {
     if (!group || !period || !records.length) { toast.error("Pick group, period, and a file"); return; }
     setBusy(true);
     try {
-      const { data } = await api.post("/feeds/batches", { group, period, source_file_name: fileName, records, is_revision: isRevision });
+      const { data } = await api.post("/feeds/batches", { group, period, source_file_name: fileName, records, is_revision: isRevision, required_approval_levels: requireSecondLevel ? 2 : 1 });
       toast.success(`Batch ${data.batch_code} created — ${data.failed_records} validation errors`);
       nav(`/feeds/batches/${data.id}`);
     } catch (e) { toast.error(e?.response?.data?.detail || "Upload failed"); }
@@ -118,6 +119,14 @@ export default function FeedUploadWizard() {
               <div className="text-xs text-slate-500">Required to overwrite an already-processed period.</div>
             </div>
             <Switch checked={isRevision} onCheckedChange={setIsRevision} />
+          </div>
+
+          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+            <div>
+              <Label className="!mt-0">Require 2nd-level approver</Label>
+              <div className="text-xs text-slate-500">Enable for high-impact batches — needs Maker + Reviewer + Approver before processing.</div>
+            </div>
+            <Switch checked={requireSecondLevel} onCheckedChange={setRequireSecondLevel} data-testid="require-second-level" />
           </div>
 
           <div className="flex items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-8 bg-slate-50">

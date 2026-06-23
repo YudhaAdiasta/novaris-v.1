@@ -4,17 +4,16 @@ import { useAuth } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/api";
 import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, ClipboardCheck, FileBarChart, History, Users, Sliders, Target, LogOut, ChevronDown, ChevronRight, Activity, AlertOctagon, Calendar, Bell, GitBranch, Briefcase, Scale, ClipboardList, FileCheck, Wrench, Home, Building2, ArrowLeftRight, Database, Upload, BarChart3 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import NotificationBell from "@/components/NotificationBell";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin","risk_officer","risk_owner","approver","viewer"], end: true },
   { to: "/risks", label: "Risk Register", icon: FileText, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/risks/new", label: "Create Risk", icon: PlusCircle, roles: ["admin","risk_officer","risk_owner"] },
   { to: "/approvals", label: "Approval Tasks", icon: ClipboardCheck, roles: ["admin","risk_officer","approver"] },
   { to: "/treatments", label: "Treatment Plans", icon: ListChecks, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/kris", label: "KRIs", icon: Activity, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/incidents", label: "Incidents", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/calendar", label: "Review Calendar", icon: Calendar, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/notifications", label: "Notifications", icon: Bell, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
   { to: "/committees", label: "Committees", icon: Briefcase, roles: ["admin","risk_officer","approver","viewer"] },
   { to: "/obligations", label: "Compliance", icon: Scale, roles: ["admin","risk_officer","risk_owner","viewer"] },
   { to: "/control-testing", label: "Control Testing", icon: FileCheck, roles: ["admin","risk_officer","risk_owner","viewer"] },
@@ -32,6 +31,7 @@ const ADMIN_NAV = [
   { to: "/admin/matrix", label: "Scoring Matrix", icon: Sliders },
   { to: "/admin/appetite", label: "Risk Appetite", icon: Target },
   { to: "/admin/escalation", label: "Escalation Matrix", icon: GitBranch },
+  { to: "/admin/feed-mapping", label: "Feed Mapping", icon: Database },
   { to: "/admin/users", label: "Users & Roles", icon: Users },
 ];
 
@@ -125,7 +125,9 @@ export default function Layout() {
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="h-14 border-b border-slate-200 bg-white sticky top-0 z-20 flex items-center justify-between px-6 lg:px-8">
           <Breadcrumbs />
-          <DropdownMenu>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button data-testid="user-menu" className="flex items-center gap-2.5 text-left hover:bg-slate-50 rounded-md px-2 py-1.5 transition">
                 <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-semibold">{user?.name?.split(" ").map(p=>p[0]).slice(0,2).join("")}</div>
@@ -144,6 +146,7 @@ export default function Layout() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </header>
         <main className="flex-1 overflow-x-hidden p-6 lg:p-8 bg-slate-50/60"><Outlet /></main>
       </div>

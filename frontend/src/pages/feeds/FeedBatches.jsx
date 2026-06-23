@@ -24,9 +24,9 @@ export default function FeedBatches() {
 
   const downloadTemplate = async (g) => {
     const t = localStorage.getItem("novaris_token");
-    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/feeds/template/${g}.csv`, { headers: { Authorization: `Bearer ${t}` } });
+    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/feeds/template/${g}.xlsx`, { headers: { Authorization: `Bearer ${t}` } });
     const blob = await res.blob();
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${g}_template.csv`; a.click();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${g}_template.xlsx`; a.click();
     toast.success("Template downloaded");
   };
 
