@@ -6,24 +6,49 @@ import { ShieldCheck, LayoutDashboard, FileText, PlusCircle, ListChecks, Clipboa
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import NotificationBell from "@/components/NotificationBell";
 
-const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin","risk_officer","risk_owner","approver","viewer"], end: true },
-  { to: "/risks", label: "Risk Register", icon: FileText, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/approvals", label: "Approval Tasks", icon: ClipboardCheck, roles: ["admin","risk_officer","approver"] },
-  { to: "/treatments", label: "Treatment Plans", icon: ListChecks, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/kris", label: "KRIs", icon: Activity, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/incidents", label: "Incidents", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/calendar", label: "Review Calendar", icon: Calendar, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/committees", label: "Committees", icon: Briefcase, roles: ["admin","risk_officer","approver","viewer"] },
-  { to: "/obligations", label: "Compliance", icon: Scale, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/control-testing", label: "Control Testing", icon: FileCheck, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/acceptances", label: "Risk Acceptance", icon: ClipboardList, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/report-builder", label: "Report Builder", icon: Wrench, roles: ["admin","risk_officer","approver","viewer"] },
-  { to: "/feeds", label: "Data Feeds", icon: Database, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/feeds/dashboards", label: "Feed Dashboards", icon: BarChart3, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/feeds/breaches", label: "Feed Breaches", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
-  { to: "/reports", label: "Reports", icon: FileBarChart, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
-  { to: "/audit", label: "Audit Trail", icon: History, roles: ["admin","risk_officer","viewer"] },
+const NAV_GROUPS = [
+  {
+    section: "Overview",
+    items: [
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin","risk_officer","risk_owner","approver","viewer"], end: true },
+    ],
+  },
+  {
+    section: "Risk Lifecycle",
+    items: [
+      { to: "/risks", label: "Risk Register", icon: FileText, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+      { to: "/approvals", label: "Approval Tasks", icon: ClipboardCheck, roles: ["admin","risk_officer","approver"] },
+      { to: "/treatments", label: "Treatment Plans", icon: ListChecks, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+      { to: "/acceptances", label: "Risk Acceptance", icon: ClipboardList, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+    ],
+  },
+  {
+    section: "Monitoring & Control",
+    items: [
+      { to: "/kris", label: "KRIs", icon: Activity, roles: ["admin","risk_officer","risk_owner","viewer"] },
+      { to: "/incidents", label: "Incidents", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
+      { to: "/control-testing", label: "Control Testing", icon: FileCheck, roles: ["admin","risk_officer","risk_owner","viewer"] },
+      { to: "/obligations", label: "Compliance", icon: Scale, roles: ["admin","risk_officer","risk_owner","viewer"] },
+      { to: "/calendar", label: "Review Calendar", icon: Calendar, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+    ],
+  },
+  {
+    section: "Data Feeds",
+    items: [
+      { to: "/feeds", label: "Data Feeds", icon: Database, roles: ["admin","risk_officer","risk_owner","viewer"] },
+      { to: "/feeds/dashboards", label: "Feed Dashboards", icon: BarChart3, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+      { to: "/feeds/breaches", label: "Feed Breaches", icon: AlertOctagon, roles: ["admin","risk_officer","risk_owner","viewer"] },
+    ],
+  },
+  {
+    section: "Governance & Reporting",
+    items: [
+      { to: "/committees", label: "Committees", icon: Briefcase, roles: ["admin","risk_officer","approver","viewer"] },
+      { to: "/report-builder", label: "Report Builder", icon: Wrench, roles: ["admin","risk_officer","approver","viewer"] },
+      { to: "/reports", label: "Reports", icon: FileBarChart, roles: ["admin","risk_officer","risk_owner","approver","viewer"] },
+      { to: "/audit", label: "Audit Trail", icon: History, roles: ["admin","risk_officer","viewer"] },
+    ],
+  },
 ];
 
 const ADMIN_NAV = [
@@ -34,6 +59,9 @@ const ADMIN_NAV = [
   { to: "/admin/feed-mapping", label: "Feed Mapping", icon: Database },
   { to: "/admin/users", label: "Users & Roles", icon: Users },
 ];
+
+const navLinkClass = ({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition ${isActive ? "bg-teal-500/15 text-teal-300 border-l-2 border-teal-400" : "text-slate-400 hover:bg-slate-800 hover:text-white border-l-2 border-transparent"}`;
+const SectionLabel = ({ children }) => <div className="pt-4 pb-1.5 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">{children}</div>;
 
 const ROUTE_LABEL = {
   "": "Dashboard", risks: "Risk Register", new: "Create", edit: "Edit",
@@ -70,7 +98,9 @@ function Breadcrumbs() {
 export default function Layout() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
-  const items = NAV.filter((n) => n.roles.includes(user?.role));
+  const groups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((n) => n.roles.includes(user?.role)) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div className="min-h-screen flex bg-slate-50">
@@ -98,23 +128,26 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-          {items.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g,'-')}`}
-              className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition ${isActive ? "bg-teal-500/15 text-teal-300 border-l-2 border-teal-400" : "text-slate-400 hover:bg-slate-800 hover:text-white border-l-2 border-transparent"}`}>
-              <n.icon className="w-4 h-4" /> {n.label}
-            </NavLink>
-          ))}
-          {user?.role === "admin" && (
-            <>
-              <div className="pt-5 pb-2 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">Administration</div>
-              {ADMIN_NAV.map((n) => (
-                <NavLink key={n.to} to={n.to} data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g,'-')}`}
-                  className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition ${isActive ? "bg-teal-500/15 text-teal-300 border-l-2 border-teal-400" : "text-slate-400 hover:bg-slate-800 hover:text-white border-l-2 border-transparent"}`}>
+        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+          {groups.map((g) => (
+            <div key={g.section}>
+              <SectionLabel>{g.section}</SectionLabel>
+              {g.items.map((n) => (
+                <NavLink key={n.to} to={n.to} end={n.end} data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g,'-')}`} className={navLinkClass}>
                   <n.icon className="w-4 h-4" /> {n.label}
                 </NavLink>
               ))}
-            </>
+            </div>
+          ))}
+          {user?.role === "admin" && (
+            <div>
+              <SectionLabel>Administration</SectionLabel>
+              {ADMIN_NAV.map((n) => (
+                <NavLink key={n.to} to={n.to} data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g,'-')}`} className={navLinkClass}>
+                  <n.icon className="w-4 h-4" /> {n.label}
+                </NavLink>
+              ))}
+            </div>
           )}
         </nav>
         <div className="p-4 border-t border-slate-800">
